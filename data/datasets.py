@@ -1,6 +1,6 @@
 def get(name):
   if name == 'babblebuds':
-    from data.babblebuds.babblebuds import get_data()
+    from data.babblebuds.babblebuds import get_data
     return get_data()
   
   else: 
