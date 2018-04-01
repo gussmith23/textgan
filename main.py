@@ -4,6 +4,9 @@
 # https://danijar.com/introduction-to-recurrent-networks-in-tensorflow/
 
 import tensorflow as tf
+from data.babblebuds.babblebuds import get_data
+
+print(get_data())
 
 def build_generator(z_prior):
   
