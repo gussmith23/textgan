@@ -88,6 +88,8 @@ import collections
 
 def something(sentences):
   
+  sentences = map(sentence_to_words, sentences)
+  
   words = [word for sentence in sentences for word in sentence]
   
   # This code comes from wherever the code in 
