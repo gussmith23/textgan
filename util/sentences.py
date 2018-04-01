@@ -44,7 +44,7 @@ def split_into_sentences(text):
     
 import string
 
-website_parts = re.compile(r"(https?:\/\/|[.](com|net|org|io|gov|me|edu))")
+website_parts = re.compile(r"(https?:\/\/|[.](com|net|org|io|gov|me|edu))",flags=re.IGNORECASE)
     
 def clean_sentences(sentences): 
   
@@ -68,3 +68,46 @@ def clean_sentences(sentences):
   
 def split_and_clean_sentences(sentences):
   return clean_sentences(split_into_sentences(sentences))
+  
+# TODO this does not handle contractions.
+def sentence_to_words(sentence):
+  sentence = sentence.lower()
+  # translate punctuation to spaces. it'll be stripped out when we split the sentence.
+  sentence = sentence.translate(str.maketrans(string.punctuation," "*len(string.punctuation)))
+  sentence = sentence.strip()
+  return sentence.split()
+
+def to_word_vectors(sentences, dictionary = None):
+  """
+    
+  dictionary: {word:id} pairs
+  """  
+  
+  
+import collections
+
+def something(sentences):
+  
+  words = [word for sentence in sentences for word in sentence]
+  
+  # This code comes from wherever the code in 
+  # https://stackoverflow.com/questions/45735357/what-is-unk-token-in-vector-representation-of-words
+  # came from. I have a feeling it's originally from tensorflow docs.
+  # Histogram of words.
+  count = [['UNK', -1]]
+  count.extend(collections.Counter(words).most_common(n_words - 1))
+  dictionary = dict()
+  for word, _ in count:
+    dictionary[word] = len(dictionary)
+  data = list()
+  unk_count = 0
+  for word in words:
+    if word in dictionary:
+      index = dictionary[word]
+    else:
+      index = 0  # dictionary['UNK']
+      unk_count += 1
+    data.append(index)
+  count[0][1] = unk_count
+  reversed_dictionary = dict(zip(dictionary.values(), dictionary.keys()))
+  return data, count, dictionary, reversed_dictionary
