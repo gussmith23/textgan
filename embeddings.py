@@ -116,7 +116,7 @@ with graph.as_default():
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=1.0).minimize(loss)
     
   norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1, keep_dims=True))
-  normalized_embeddings = embeddings / norm
+  normalized_embeddings = tf.Variable(embeddings / norm, name = 'normalized_embeddings')
     
   # Need to understand this better! TF is interesting. This initializes the
   # above vars (e.g. our embeddings)
