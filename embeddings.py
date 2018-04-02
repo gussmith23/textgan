@@ -101,8 +101,6 @@ with graph.as_default():
   with tf.name_scope('biases'):
     nce_biases = tf.Variable(tf.zeros([vocabulary_size]))
 
-
-
   with tf.name_scope('loss'):
     # Compute the NCE loss, using a sample of the negative labels each time.
     loss = tf.reduce_mean(
@@ -132,15 +130,15 @@ with tf.Session(graph=graph) as session:
   # TODO they do this differently in the TF docs. They basically set a number
   # of minibatches to iterate over. Here, we instead set a number of times to
   # iterate over all minibatches.
-  for i in range(3):
-    print (i)
+  iterations = 200
+  for i in range(iterations):
+    print("{}/{}".format(i+1,iterations))
     for inputs, labels in generate_batch():
       feed_dict = {train_inputs: inputs, train_labels: labels}
-      _, cur_loss = session.run([optimizer, loss], feed_dict=feed_dict)
-     
-  final_embeddings = normalized_embeddings.eval()
+      _, cur_loss = session.run([optimizer, loss], feed_dict=feed_dict) 
+    saver.save(session, os.path.join(FLAGS.log_dir, 'embeddings_model.ckpt'))
   
-  saver.save(session, os.path.join(FLAGS.log_dir, 'model.ckpt'))
+  final_embeddings = normalized_embeddings.eval()
   
 # Visualization
 def plot_with_labels(low_dim_embs, labels, filename):
