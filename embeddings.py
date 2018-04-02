@@ -13,6 +13,10 @@ from itertools import islice
 import tensorflow as tf
 import math
 import numpy as np
+import os
+import sys
+import argparse
+from tempfile import gettempdir
 
 # As input, we need
 
@@ -28,6 +32,23 @@ embedding_size = 128
 num_sampled = 64  # Number of negative examples to sample.
 
 batch_size = 16
+
+# Give a folder path as an argument with '--log_dir' to save
+# TensorBoard summaries. Default is a log folder in current directory.
+current_path = os.path.dirname(os.path.realpath(sys.argv[0]))
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--log_dir',
+    type=str,
+    default=os.path.join(current_path, 'log'),
+    help='The log directory for TensorBoard summaries.')
+FLAGS, unparsed = parser.parse_known_args()
+
+# Create the directory for TensorBoard variables if there is not.
+if not os.path.exists(FLAGS.log_dir):
+  os.makedirs(FLAGS.log_dir)
+
 
 # TODO should we be ignoring UNK?
 def generate_batch(batch_size = 16):
@@ -96,13 +117,54 @@ with graph.as_default():
     # We use the SGD optimizer.
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=1.0).minimize(loss)
     
+  norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1, keep_dims=True))
+  normalized_embeddings = embeddings / norm
+    
   # Need to understand this better! TF is interesting. This initializes the
   # above vars (e.g. our embeddings)
   init = tf.global_variables_initializer()
+  
+  saver = tf.train.Saver()
 
 
 with tf.Session(graph=graph) as session:
   init.run()
-  for inputs, labels in generate_batch():
-    feed_dict = {train_inputs: inputs, train_labels: labels}
-    _, cur_loss = session.run([optimizer, loss], feed_dict=feed_dict)
+  # TODO they do this differently in the TF docs. They basically set a number
+  # of minibatches to iterate over. Here, we instead set a number of times to
+  # iterate over all minibatches.
+  for i in range(3):
+    print (i)
+    for inputs, labels in generate_batch():
+      feed_dict = {train_inputs: inputs, train_labels: labels}
+      _, cur_loss = session.run([optimizer, loss], feed_dict=feed_dict)
+     
+  final_embeddings = normalized_embeddings.eval()
+  
+  saver.save(session, os.path.join(FLAGS.log_dir, 'model.ckpt'))
+  
+# Visualization
+def plot_with_labels(low_dim_embs, labels, filename):
+  assert low_dim_embs.shape[0] >= len(labels), 'More labels than embeddings'
+  plt.figure(figsize=(18, 18))  # in inches
+  for i, label in enumerate(labels):
+    x, y = low_dim_embs[i, :]
+    plt.scatter(x, y)
+    plt.annotate(
+        label,
+        xy=(x, y),
+        xytext=(5, 2),
+        textcoords='offset points',
+        ha='right',
+        va='bottom')
+
+  plt.savefig(filename)
+
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+
+tsne = TSNE(
+    perplexity=30, n_components=2, init='pca', n_iter=5000, method='exact')
+plot_only = 500
+low_dim_embs = tsne.fit_transform(final_embeddings[:plot_only, :])
+labels = [reversed_dictionary[i] for i in range(plot_only)]
+plot_with_labels(low_dim_embs, labels, 'tsne.png')
