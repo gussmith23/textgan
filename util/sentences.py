@@ -2,6 +2,8 @@
 # https://stackoverflow.com/questions/4576077/python-split-text-on-sentences?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
 # -*- coding: utf-8 -*-
 import re
+import logging
+
 caps = "([A-Z])"
 digits = "([0-9])"
 prefixes = "(Mr|St|Mrs|Ms|Dr|Prof|Capt|Cpt|Lt|Mt)[.]"
@@ -11,6 +13,7 @@ acronyms = "([A-Z][.][A-Z][.](?:[A-Z][.])?)"
 websites = "[.](com|net|org|io|gov|me|edu)"
 
 def split_into_sentences(text):
+    original_text = text
     text = " " + text + "  "
     text = text.replace("\n"," ")
     text = text.replace("e.g.","e<prd>g<prd>")
@@ -45,6 +48,8 @@ def split_into_sentences(text):
     # by getting rid of empty strings (after stripping)
     sentences = [s.strip() for s in sentences]
     sentences = list(filter(lambda sentence: sentence != '', sentences))
+    logging.debug("broke the string \'{}\' into".format(original_text))
+    logging.debug(sentences)
     return sentences
     
 import string

@@ -4,7 +4,7 @@ import pickle
 import util.sentences
 from data.babblebuds.babblebuds_config import user_whitelist
 import collections # for counter
-
+import logging
 
 data_filepath = os.path.join(os.path.dirname(__file__), "babble-buds-dump.txt")
 pickle_filepath = os.path.join(os.path.dirname(__file__), "babble-buds-dump.p")
@@ -30,6 +30,8 @@ def parse_data():
     
     message = None
     sender = None
+    
+    logging.info("parsing messages from file, cleaning messages, and splitting them into setences...")
     
     for l in f:
       match =  pat.match(l)
@@ -59,7 +61,7 @@ def parse_data():
   #   ....
   # }
   # Where sentence1 looks like [word1,word2,word3,...]
-  
+    
   # sender_dictionary maps name to ID.
   sender_enum = enumerate(sentences_by_sender.keys())
   sender_dictionary = dict(map(lambda x: (x[1],x[0]), sender_enum))
@@ -71,6 +73,8 @@ def parse_data():
   
   # Get a giant list of all words.
   all_words = reduce(operator.add, reduce(operator.add, sentences_by_sender.values(), []), [])
+  
+  logging.info("converting sentences into arrays of word ids...")
   
   n_words = 6000
   
@@ -102,7 +106,6 @@ def parse_data():
   count[0][1] = unk_count
   
   reversed_dictionary = dict(zip(dictionary.values(), dictionary.keys()))
-
     
   data_out = (data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary)
   pickle.dump(data_out, open(pickle_filepath,"wb"))
