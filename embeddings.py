@@ -130,7 +130,7 @@ with tf.Session(graph=graph) as session:
   # TODO they do this differently in the TF docs. They basically set a number
   # of minibatches to iterate over. Here, we instead set a number of times to
   # iterate over all minibatches.
-  iterations = 200
+  iterations = 10
   for i in range(iterations):
     print("{}/{}".format(i+1,iterations))
     for inputs, labels in generate_batch():
