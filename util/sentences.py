@@ -38,8 +38,13 @@ def split_into_sentences(text):
     text = text.replace("!","!<stop>")
     text = text.replace("<prd>",".")
     sentences = text.split("<stop>")
-    sentences = sentences[:-1]
+    # this was their attempt at getting rid of the empty string that comes after the split.
+    # i.e. hello. becomes ['hello','']
+    #sentences = sentences[:-1]
+    # because people so often don't use punctuation, we will do this a different way: 
+    # by getting rid of empty strings (after stripping)
     sentences = [s.strip() for s in sentences]
+    sentences = list(filter(lambda sentence: sentence != '', sentences))
     return sentences
     
 import string
