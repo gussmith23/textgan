@@ -17,10 +17,28 @@ import os
 import sys
 import argparse
 from tempfile import gettempdir
+import argparse
 
-# As input, we need
+parser = argparse.ArgumentParser(description='Generate word embeddings.')
+# parser.add_argument('integers', metavar='N', type=int, nargs='+',
+#                     help='an integer for the accumulator')
+parser.add_argument('--dataset-name', type=str, required=True,
+                    help='name of dataset')
+parser.add_argument('--iterations', type=int, default=10,
+                    help='how many times to train over the entire dataset')
+# Give a folder path as an argument with '--log_dir' to save
+# TensorBoard summaries. Default is a log folder in current directory.
+current_path = os.path.dirname(os.path.realpath(sys.argv[0]))
+parser.add_argument(
+    '--log_dir',
+    type=str,
+    default=os.path.join(current_path, 'log'),
+    help='The log directory for TensorBoard summaries.')
+FLAGS, unparsed = parser.parse_known_args()
+args = parser.parse_args()
 
-dataset_name = 'babblebuds'
+
+dataset_name = FLAGS.dataset_name
 data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = data.datasets.get(dataset_name)
 
 all_sentences = reduce(operator.add, data.values(), [])
@@ -30,20 +48,7 @@ vocabulary_size = len(dictionary.keys())
 # Defaults chosen from the github link above.
 embedding_size = 128
 num_sampled = 64  # Number of negative examples to sample.
-
 batch_size = 16
-
-# Give a folder path as an argument with '--log_dir' to save
-# TensorBoard summaries. Default is a log folder in current directory.
-current_path = os.path.dirname(os.path.realpath(sys.argv[0]))
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    '--log_dir',
-    type=str,
-    default=os.path.join(current_path, 'log'),
-    help='The log directory for TensorBoard summaries.')
-FLAGS, unparsed = parser.parse_known_args()
 
 # Create the directory for TensorBoard variables if there is not.
 if not os.path.exists(FLAGS.log_dir):
@@ -130,7 +135,7 @@ with tf.Session(graph=graph) as session:
   # TODO they do this differently in the TF docs. They basically set a number
   # of minibatches to iterate over. Here, we instead set a number of times to
   # iterate over all minibatches.
-  iterations = 10
+  iterations = FLAGS.iterations
   for i in range(iterations):
     print("{}/{}".format(i+1,iterations))
     for inputs, labels in generate_batch():
