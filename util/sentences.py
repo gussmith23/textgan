@@ -83,9 +83,10 @@ def split_and_clean_sentences(sentences):
   return clean_sentences(split_into_sentences(sentences))
   
 # TODO this does not handle contractions.
+# We append the <END> symbol to the end of the sentence.
 def sentence_to_words(sentence):
   sentence = sentence.lower()
   # translate punctuation to spaces. it'll be stripped out when we split the sentence.
   sentence = sentence.translate(str.maketrans(string.punctuation," "*len(string.punctuation)))
   sentence = sentence.strip()
-  return sentence.split()
+  return sentence.split() + ["<END>"]

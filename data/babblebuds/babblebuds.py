@@ -86,6 +86,8 @@ def parse_data():
   # Histogram of words.
   count = [['UNK', -1]]
   count.extend(collections.Counter(all_words).most_common(n_words - 1))
+  # TODO we're assuming that the <END> token ends up in the collection. this is really bad practice!
+  # however, it should always be among the top most common words.
   dictionary = dict()
   for word, _ in count:
     dictionary[word] = len(dictionary)
