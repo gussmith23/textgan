@@ -8,7 +8,7 @@
 import argparse
 import tensorflow as tf
 import data.datasets
-
+import numpy as np
 from tensorflow.python.util import nest
 
 parser = argparse.ArgumentParser(description='TextGAN implementation.')
@@ -69,8 +69,8 @@ def build_generator(z_prior,
       next_word_id = tf.argmax(tf.matmul(V, tf.transpose(cell_state.h))+Vb)
       next_word = tf.nn.embedding_lookup(embeddings, next_word_id)
       next_loop_state = next_word_id
-    
-    elements_finished = (next_word_id == end_of_sentence_id)
+      
+    elements_finished = (time > 10) # TODO (next_word_id == end_of_sentence_id)
     
     return (elements_finished, next_word, next_cell_state,
             emit_output, next_loop_state)
@@ -87,3 +87,12 @@ state_size = 10
 z_prior = tf.placeholder(tf.float32, [state_size,1], name="z_prior")
 emit_ta, g_params = build_generator(z_prior, out_embeddings, 1, num_classes, state_size=10)
 
+with tf.Session() as sess:
+  init = tf.global_variables_initializer()
+  sess.run(init)
+  z_value = np.random.normal(0, 1, size=(state_size, 1)).astype(np.float32)
+  # using concat() to turn it from a tensor array to a tensor
+  out = sess.run(emit_ta.concat(),
+                  feed_dict={z_prior: z_value})
+  for v in out: print(reversed_dictionary[v[0]])
+  
