@@ -10,6 +10,10 @@ import tensorflow as tf
 import data.datasets
 import numpy as np
 from tensorflow.python.util import nest
+from tensorflow.python.ops.rnn import _transpose_batch_time
+import operator
+from functools import reduce
+
 
 parser = argparse.ArgumentParser(description='TextGAN implementation.')
 # parser.add_argument('integers', metavar='N', type=int, nargs='+',
@@ -25,9 +29,12 @@ args = parser.parse_args()
 dataset_name = args.dataset_name
 data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = data.datasets.get(dataset_name)
 num_classes = len(dictionary)
+all_sentences = reduce(operator.add, data.values(), [])
+batch_size = 16
+prior_size = 10
+end_of_sentence_id = 1 # TODO this should probably come from the data.
 
 max_sentence_length = max([len(sentence) for sentences in data.values() for sentence in sentences])
-print(max_sentence_length)
 
 # Get embeddings. TODO i have no clue if this is a good way to do this...
 embeddings = tf.Variable(-1.0, validate_shape=False, name=args.embeddings_tensor_name)
@@ -37,18 +44,36 @@ with tf.Session() as sess:
   out_embeddings = sess.run([embeddings])
   embedding_size = out_embeddings[0][0].shape[0]
 
+def batch_gen():
+  """
+  Returns a TensorArray, not a Tensor.
+  TensorArray length is batch_size, while each Tensor within is a 1-D vector of 
+  word IDs.
+  """
+  i = 0
+  while i < len(all_sentences):
+    # TODO this is a mess...
+    yield tf.stack([tf.pad(tf.stack([tf.nn.embedding_lookup(out_embeddings, id) for id in sentence]), [[0,max_sentence_length-len(sentence)],[0,0]], 'CONSTANT', constant_values=0) for sentence in all_sentences[i:batch_size]])
+    i += batch_size
+  
 def build_generator(z_prior,
                     embeddings,
-                    end_of_sentence_id,
-                    num_classes,
-                    batch_size = 16,
                     num_steps = 10,
                     state_size = 10):
 
-  V = tf.get_variable('V', [num_classes, state_size])
-  Vb = tf.get_variable('Vb', [num_classes, 1], initializer=tf.constant_initializer(0.0))
-  C = tf.get_variable('C', [state_size, state_size])
-  Cb = tf.get_variable('Cb', [state_size, 1], initializer=tf.constant_initializer(0.0))
+  
+  tf.Assert(tf.rank(z_prior) == 2, [z_prior])
+  tf.Assert(tf.shape(z_prior)[0] == batch_size, [z_prior])
+  tf.Assert(tf.shape(z_prior)[1] == prior_size, [z_prior])
+  
+  cell = tf.nn.rnn_cell.LSTMCell(state_size, state_is_tuple=True)
+  #cell = tf.nn.rnn_cell.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
+  init_state = cell.zero_state(batch_size, tf.float32)
+
+  V = tf.get_variable('V', [state_size, num_classes])
+  Vb = tf.get_variable('Vb', [num_classes], initializer=tf.constant_initializer(0.0))
+  C = tf.get_variable('C', [prior_size, state_size])
+  Cb = tf.get_variable('Cb', [state_size], initializer=tf.constant_initializer(0.0))
   
   def loop_fn(time, cell_output, cell_state, loop_state):
     if cell_output is None:
@@ -57,65 +82,72 @@ def build_generator(z_prior,
       # TODO not sure about this
       # what i do know is that, according to the __call__ method of cells,
       # the state shape should be [batch size, state size], or [1, state size] for  us
-      next_cell_state = tf.contrib.rnn.LSTMStateTuple(c = tf.reshape(tf.tanh(tf.matmul(C,z_prior) + Cb), [1,state_size]),
-                                                      h = tf.reshape(tf.tanh(tf.matmul(C,z_prior) + Cb), [1,state_size]))
-      next_word_id = tf.argmax(tf.matmul(V,tf.transpose(next_cell_state.h))+Vb)
-      next_word = tf.nn.embedding_lookup(embeddings, next_word_id)
+      h1 = tf.tanh(tf.matmul(z_prior, C) + Cb)
+      tf.Assert(tf.shape(h1)[0] == batch_size and tf.shape(h1)[1] == state_size, [h1])
+      next_cell_state = tf.contrib.rnn.LSTMStateTuple(c = init_state.c,
+                                                      h = h1)
+      next_word_id = tf.argmax(tf.matmul(h1, V)+Vb, axis = 1)
+      tf.Assert(tf.rank(next_word_id) == 1 and tf.shape(next_word_id)[0] == batch_size, [next_word_id])
+      
+      next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
+      # TODO i'm fairly certain this is the correct shape, but i'm not 100%
+      tf.Assert(tf.rank(next_word) == 2, [next_word])
+      tf.Assert(tf.shape(next_word)[0] == batch_size and tf.shape(next_word_id)[1] == embedding_size, [next_word])
+
       next_loop_state = next_word_id # this is what should be emitted next
-      emit_output = next_word_id
+      emit_output = tf.zeros([], dtype=tf.int64)
 
     else: 
       # If this first emit_output return value is None, then the emit_ta result of raw_rnn will have the same structure and dtypes as cell.output_size. Otherwise emit_ta will have the same structure, shapes (prepended with a batch_size dimension), and dtypes as emit_output.
       # so we needed to expand this so that its first dim is the batch size
-      # however, currently the output is 
-      emit_output = tf.expand_dims(loop_state,0)
+      #emit_output = tf.expand_dims(loop_state,0)
+      # this shouldn't be the case anymore...we should be able to directly do:
+      emit_output = loop_state
       next_cell_state = cell_state
-      next_word_id = tf.argmax(tf.matmul(V, tf.transpose(cell_state.h))+Vb)
-      next_word = tf.nn.embedding_lookup(embeddings, next_word_id)
+      next_word_id = tf.argmax(tf.matmul(cell_state.h, V)+Vb, axis = 1)
+      next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
       next_loop_state = next_word_id
       
-    elements_finished = (time > 10) # TODO (next_word_id == end_of_sentence_id)
-    
+    elements_finished = (time == max_sentence_length) # TODO this should be improved
+        
     return (elements_finished, next_word, next_cell_state,
             emit_output, next_loop_state)
     
   
-  cell = tf.nn.rnn_cell.LSTMCell(state_size, state_is_tuple=True)
-  #cell = tf.nn.rnn_cell.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
-  #init_state = cell.zero_state(batch_size, tf.float32)
   emit_ta, final_state, final_loop_state = tf.nn.raw_rnn(cell, loop_fn)
   
+  # rnn_outputs: [batch_size, sentence length, embedding size]
+  rnn_outputs = _transpose_batch_time(emit_ta.stack())
   
-  
-  return emit_ta, [V, Vb, C, Cb]
+  return rnn_outputs, [V, Vb, C, Cb]
 
   # TODO don't want to be using max sentence length here.
   # OR, at the very least, i want to be trimming down the sentences.
-def build_discriminator(x_data, x_generated, max_sentence_length):
+def build_discriminator(x_data, x_generated):
   """
-  assuming that these come in as shape [sentence_length, embedding_size]
+  assuming that these come in as shape [batch_size, sentence_length, embedding_size]
   """
-  tf.Assert(x_data.dtype == x_generated.dtype, [x_data, x_generated])
-  
-  tf.Assert(x_data.shape[1] == x_generated.shape[1],  [x_data, x_generated])
-  embedding_size = x_data.get_shape().as_list()[1]
+  # TODO my asserts are all messed up.
+  # assert(x_data.dtype == x_generated.dtype)
+  # assert(x_data.shape.as_list() == x_generated.shape.as_list())
+  # assert(x_data.shape[2] == x_generated.shape[2])
   
   # sentence_length = tf.maximum(tf.shape(x_data)[0], tf.shape(x_generated)[0])
   
   # first, make sure that they're the same size.
   # this is is kind of a hack that relies on broadcasting, but it's simple.
   # https://stackoverflow.com/questions/34362193/how-to-explicitly-broadcast-a-tensor-to-match-anothers-shape-in-tensorflow?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
-  x_data = tf.pad(x_data, [[0, max_sentence_length-tf.shape(x_data)[0]], [0,0]], 'CONSTANT', constant_values=0)
-  x_generated = tf.pad(x_generated, [[0, max_sentence_length-tf.shape(x_generated)[0]], [0,0]], 'CONSTANT', constant_values=0)
-  x_data.set_shape([max_sentence_length,embedding_size])
-  x_generated.set_shape([max_sentence_length,embedding_size])
-  
-  tf.Assert(x_data.shape == x_generated.shape, [x_data, x_generated])
-  tf.Assert(x_data.dtype == x_generated.dtype, [x_data, x_generated])
-  
-  # stack into a batch
-  x_in = tf.stack([x_data, x_generated]) 
-  x_in = tf.expand_dims(x_in,3) # add channel dimension
+  # x_data = tf.pad(x_data, [[0,0], [0, max_sentence_length-tf.shape(x_data)[0]], [0,0]], 'CONSTANT', constant_values=0)
+  # x_generated = tf.pad(x_generated, [[0,0], [0, max_sentence_length-tf.shape(x_generated)[0]], [0,0]], 'CONSTANT', constant_values=0)
+  # x_data.set_shape([batch_size,max_sentence_length,embedding_size])
+  # x_generated.set_shape([batch_size,max_sentence_length,embedding_size])
+    
+  # concatenate batches
+  assert_same_size = tf.Assert(tf.shape(x_data) == tf.shape(x_generated), [tf.shape(x_data), tf.shape(x_generated)])
+  with tf.control_dependencies([assert_same_size]):
+    x_in = tf.concat([x_data, x_generated], 0) 
+    x_in = tf.expand_dims(x_in,3) # add channel dimension
+    assert(x_in.get_shape().as_list() == [2*batch_size, max_sentence_length, embedding_size, 1])
   
   # building the CNN with help from
   # - Kim 2014 (which describes the CNN)
@@ -148,32 +180,49 @@ def build_discriminator(x_data, x_generated, max_sentence_length):
   with tf.variable_scope('fullyconnected') as scope:
     # Move everything into depth so we can perform a single matrix multiply.
     reshape = tf.reshape(pool1, [x_in.get_shape().as_list()[0], -1])
+    # TODO can this be computed statically? i think it can, i'm just too lazy to do it right now.
     dim = tf.shape(reshape)[1]
     fc_weights = tf.Variable(tf.random_normal([dim, 2]), validate_shape=False)
     fc_bias = tf.Variable(tf.random_normal([2])) # TODO initialize to zero?
     fc = tf.matmul(reshape, fc_weights) + fc_bias
     fc = tf.identity(fc, name=scope.name)
 
-  softmax = tf.nn.softmax(fc, name="softmax")
-  
-  return softmax
+  y_data = tf.nn.softmax(tf.slice(fc, [0, 0], [batch_size, -1], name=None))
+  y_generated = tf.nn.softmax(tf.slice(fc, [batch_size, 0], [-1, -1], name=None))
+
+  return y_data, y_generated, [conv1_filter, conv1_bias, fc_weights, fc_bias]
   
 state_size = 10
-z_prior = tf.placeholder(tf.float32, [state_size,1], name="z_prior")
-emit_ta, g_params = build_generator(z_prior, out_embeddings, 1, num_classes, state_size=10)
-sentence = tf.map_fn(lambda word_id: tf.nn.embedding_lookup(out_embeddings, word_id[0]), emit_ta.concat(), dtype=tf.float32)
-x_word_ids = tf.placeholder(tf.int64, [None], name="x_word_ids")
-x_data = tf.map_fn(lambda word_id: tf.nn.embedding_lookup(out_embeddings, word_id), x_word_ids, dtype=tf.float32)
-softmax = build_discriminator(x_data, sentence, max_sentence_length)
+z_prior = tf.placeholder(tf.float32, [batch_size, prior_size], name="z_prior")
+
+emit_ta, g_params = build_generator(z_prior, out_embeddings, state_size=10)
+
+# TODO this only works b/c everything in the emit_ta tensorarray is the same length.
+x_generated = tf.map_fn(lambda sentence: tf.map_fn(lambda word_id: tf.nn.embedding_lookup(out_embeddings, word_id), sentence, dtype=tf.float32), emit_ta, dtype=tf.float32)
+
+x_data = tf.Variable(tf.zeros(dtype=tf.float32, shape=[batch_size, max_sentence_length, embedding_size]))
+
+softmax = build_discriminator(x_data, x_generated)
 
 with tf.Session() as sess:
   init = tf.global_variables_initializer()
   sess.run(init)
   
-  for data_sentence in data[0]:
-    z_value = np.random.normal(0, 1, size=(state_size, 1)).astype(np.float32)
-    # using concat() to turn it from a tensor array to a tensor
+  all_sentences = reduce(operator.add, data.values(), [])
+  
+  for batch in batch_gen():
+    tf.logging.set_verbosity(tf.logging.INFO)
+
+    z_value = np.random.normal(0, 1, size=(batch_size, prior_size)).astype(np.float32)
+    
+    # TODO this is kind of messy. basically, batch_gen() returns a tensor, which
+    # must be "fed" through this assign call here. batch_gen() has to return a
+    # tensor because i'm not sure how else to feed sentences in. 
+    # if we feed just IDs, then each sentence has to be padded already when it
+    # gets fed in, in which case we need some reserved ID which should be
+    # converted to padding instead of being looked up in the embeddings.
+    sess.run(x_data.assign(batch))
     out = sess.run(softmax,
-                    feed_dict={z_prior: z_value, x_word_ids:data_sentence})
+                    feed_dict={z_prior: z_value})
     print(out)
   
