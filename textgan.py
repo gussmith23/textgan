@@ -26,13 +26,17 @@ dataset_name = args.dataset_name
 data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = data.datasets.get(dataset_name)
 num_classes = len(dictionary)
 
+max_sentence_length = max([len(sentence) for sentences in data.values() for sentence in sentences])
+print(max_sentence_length)
+
 # Get embeddings. TODO i have no clue if this is a good way to do this...
 embeddings = tf.Variable(-1.0, validate_shape=False, name=args.embeddings_tensor_name)
 saver = tf.train.Saver()
 with tf.Session() as sess:
   saver.restore(sess, "log/embeddings_model.ckpt")
   out_embeddings = sess.run([embeddings])
-  
+  embedding_size = out_embeddings[0][0].shape[0]
+
 def build_generator(z_prior,
                     embeddings,
                     end_of_sentence_id,
@@ -81,18 +85,95 @@ def build_generator(z_prior,
   #init_state = cell.zero_state(batch_size, tf.float32)
   emit_ta, final_state, final_loop_state = tf.nn.raw_rnn(cell, loop_fn)
   
+  
+  
   return emit_ta, [V, Vb, C, Cb]
 
+  # TODO don't want to be using max sentence length here.
+  # OR, at the very least, i want to be trimming down the sentences.
+def build_discriminator(x_data, x_generated, max_sentence_length):
+  """
+  assuming that these come in as shape [sentence_length, embedding_size]
+  """
+  tf.Assert(x_data.dtype == x_generated.dtype, [x_data, x_generated])
+  
+  tf.Assert(x_data.shape[1] == x_generated.shape[1],  [x_data, x_generated])
+  embedding_size = x_data.get_shape().as_list()[1]
+  
+  # sentence_length = tf.maximum(tf.shape(x_data)[0], tf.shape(x_generated)[0])
+  
+  # first, make sure that they're the same size.
+  # this is is kind of a hack that relies on broadcasting, but it's simple.
+  # https://stackoverflow.com/questions/34362193/how-to-explicitly-broadcast-a-tensor-to-match-anothers-shape-in-tensorflow?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+  x_data = tf.pad(x_data, [[0, max_sentence_length-tf.shape(x_data)[0]], [0,0]], 'CONSTANT', constant_values=0)
+  x_generated = tf.pad(x_generated, [[0, max_sentence_length-tf.shape(x_generated)[0]], [0,0]], 'CONSTANT', constant_values=0)
+  x_data.set_shape([max_sentence_length,embedding_size])
+  x_generated.set_shape([max_sentence_length,embedding_size])
+  
+  tf.Assert(x_data.shape == x_generated.shape, [x_data, x_generated])
+  tf.Assert(x_data.dtype == x_generated.dtype, [x_data, x_generated])
+  
+  # stack into a batch
+  x_in = tf.stack([x_data, x_generated]) 
+  x_in = tf.expand_dims(x_in,3) # add channel dimension
+  
+  # building the CNN with help from
+  # - Kim 2014 (which describes the CNN)
+  # - https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10/cifar10.py
+  
+  with tf.variable_scope('conv1') as scope:
+    # filter: [filter_height, filter_width, in_channels, out_channels]
+    # height is the number of words we want, while width should be the size of the embedding (always).
+    # from Kim 2014: filter windows (h) of 3, 4, 5 with 100 feature maps each
+    # TODO how do i handle 3, 4, and 5 simultaneously? can i?
+    num_words = 3; num_filters = 100
+    conv1_filter = tf.Variable(tf.random_normal([num_words, embedding_size, 1, num_filters]))
+    conv1_bias = tf.Variable(tf.random_normal([num_filters])) # TODO initialize to zero?
+    conv = tf.nn.conv2d(x_in, conv1_filter, [1, 1, 1, 1], padding='VALID')
+    conv += conv1_bias 
+    
+    # TODO the paper uses tanh, but TF loves RELU; could try both.
+    conv1 = tf.nn.tanh(conv, name=scope.name)
+  
+  # conv1 should be shape [batch_size, sentence_length - (num_words-1), 1, num_filters]
+  # TODO could make this an assert if you want...
+  
+  # pool1
+  pool1 = tf.nn.max_pool(conv1, ksize=[1, embedding_size, 1, 1], strides=[1, 1, 1, 1],
+                         padding='VALID', name='pool1')
+
+  
+  # TODO no dropout implemented yet
+  
+  with tf.variable_scope('fullyconnected') as scope:
+    # Move everything into depth so we can perform a single matrix multiply.
+    reshape = tf.reshape(pool1, [x_in.get_shape().as_list()[0], -1])
+    dim = tf.shape(reshape)[1]
+    fc_weights = tf.Variable(tf.random_normal([dim, 2]), validate_shape=False)
+    fc_bias = tf.Variable(tf.random_normal([2])) # TODO initialize to zero?
+    fc = tf.matmul(reshape, fc_weights) + fc_bias
+    fc = tf.identity(fc, name=scope.name)
+
+  softmax = tf.nn.softmax(fc, name="softmax")
+  
+  return softmax
+  
 state_size = 10
 z_prior = tf.placeholder(tf.float32, [state_size,1], name="z_prior")
 emit_ta, g_params = build_generator(z_prior, out_embeddings, 1, num_classes, state_size=10)
+sentence = tf.map_fn(lambda word_id: tf.nn.embedding_lookup(out_embeddings, word_id[0]), emit_ta.concat(), dtype=tf.float32)
+x_word_ids = tf.placeholder(tf.int64, [None], name="x_word_ids")
+x_data = tf.map_fn(lambda word_id: tf.nn.embedding_lookup(out_embeddings, word_id), x_word_ids, dtype=tf.float32)
+softmax = build_discriminator(x_data, sentence, max_sentence_length)
 
 with tf.Session() as sess:
   init = tf.global_variables_initializer()
   sess.run(init)
-  z_value = np.random.normal(0, 1, size=(state_size, 1)).astype(np.float32)
-  # using concat() to turn it from a tensor array to a tensor
-  out = sess.run(emit_ta.concat(),
-                  feed_dict={z_prior: z_value})
-  for v in out: print(reversed_dictionary[v[0]])
+  
+  for data_sentence in data[0]:
+    z_value = np.random.normal(0, 1, size=(state_size, 1)).astype(np.float32)
+    # using concat() to turn it from a tensor array to a tensor
+    out = sess.run(softmax,
+                    feed_dict={z_prior: z_value, x_word_ids:data_sentence})
+    print(out)
   
