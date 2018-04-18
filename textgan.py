@@ -15,6 +15,8 @@ import operator
 from functools import reduce
 
 
+tf.logging.set_verbosity(tf.logging.DEBUG)
+
 parser = argparse.ArgumentParser(description='TextGAN implementation.')
 # parser.add_argument('integers', metavar='N', type=int, nargs='+',
 #                     help='an integer for the accumulator')
@@ -255,10 +257,12 @@ with tf.Session(config=config) as sess:
   sess.run(init)
   writer.close()
   
+  num_batches = len(all_sentences)//batch_size
   
-  for batch in batch_gen():
-    tf.logging.set_verbosity(tf.logging.INFO)
-
+  tf.logging.info("Beginnning training.")
+  for batch_i, batch in enumerate(batch_gen()):
+    tf.logging.info("Batch: {}/{}".format(batch_i, num_batches))
+    
     z_value = np.random.normal(0, 1, size=(batch_size, prior_size)).astype(np.float32)
     
     # TODO this is kind of messy. basically, batch_gen() returns a tensor, which
