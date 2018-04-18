@@ -40,7 +40,11 @@ end_of_sentence_id = 1 # TODO this should probably come from the data.
 # not sure what to set it to; they don't discuss.
 L = 100
 
-max_sentence_length = max([len(sentence) for sentences in data.values() for sentence in sentences])
+# Internal LSTM state size.
+state_size = 4
+
+#max_sentence_length = max([len(sentence) for sentences in data.values() for sentence in sentences])
+max_sentence_length = 20
 
 # Get embeddings. TODO i have no clue if this is a good way to do this...
 embeddings = tf.Variable(-1.0, validate_shape=False, name=args.embeddings_tensor_name)
@@ -224,7 +228,6 @@ def build_discriminator(x_data, x_generated):
 
   return y_data, y_generated, [conv1_filter, conv1_bias, fc_weights, fc_bias]
   
-state_size = 10
 z_prior = tf.placeholder(tf.float32, [batch_size, prior_size], name="z_prior")
 
 x_generated_ids, x_generated, g_params = build_generator(z_prior, out_embeddings, state_size=10)
