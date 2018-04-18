@@ -32,7 +32,7 @@ dataset_name = args.dataset_name
 data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = data.datasets.get(dataset_name)
 num_classes = len(dictionary)
 all_sentences = reduce(operator.add, data.values(), [])
-batch_size = 16
+batch_size = 8
 prior_size = 10
 end_of_sentence_id = 1 # TODO this should probably come from the data.
 
@@ -41,10 +41,12 @@ end_of_sentence_id = 1 # TODO this should probably come from the data.
 L = 100
 
 # Internal LSTM state size.
-state_size = 4
+state_size = 10
 
 #max_sentence_length = max([len(sentence) for sentences in data.values() for sentence in sentences])
 max_sentence_length = 20
+
+max_epochs = 100
 
 # Get embeddings. TODO i have no clue if this is a good way to do this...
 embeddings = tf.Variable(-1.0, validate_shape=False, name=args.embeddings_tensor_name)
@@ -286,3 +288,4 @@ with tf.Session(config=config) as sess:
 
     tf.logging.debug("Generated sentences: {}".format("\n".join([" ".join([reversed_dictionary[word_id] for word_id in sentence]) for sentence in out_sentence])))
   
+  print("done!")
