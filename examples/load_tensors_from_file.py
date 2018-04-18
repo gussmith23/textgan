@@ -6,9 +6,10 @@ saver = tf.train.Saver()
 
 with tf.Session() as sess:
   saver.restore(sess, "log/embeddings_model.ckpt")
-  out_embeddings = sess.run([embeddings])
+  out_embeddings = sess.run(embeddings)
   
 print(out_embeddings)
+print(out_embeddings.shape)
 
 graph = tf.Graph()
 with graph.as_default(): 
