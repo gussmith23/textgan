@@ -109,11 +109,21 @@ def build_generator(z_prior,
       tf.Assert(tf.rank(next_word) == 2, [next_word])
       tf.Assert(tf.shape(next_word)[0] == batch_size and tf.shape(next_word_id)[1] == embedding_size, [next_word])
 
-      next_loop_state = next_word_id # this is what should be emitted next
-      emit_output = tf.zeros([], dtype=tf.int64)
+      next_loop_state = (next_word_id, next_word) # this is what should be emitted next
+      # this tells raw_rnn what the rest of our emits will look like.
+      # first item: the id of the word that was generated
+      # second item: the embedding of the word that was generated, calculated
+      # via soft-argmax.
+      # basically a placeholder for what INDIVIDUAL batch items will be emitting on
+      # each iteration.
+      emit_output = (tf.zeros([], dtype=tf.int64), tf.zeros([embedding_size], dtype=tf.float32))
 
     else: 
-      # If this first emit_output return value is None, then the emit_ta result of raw_rnn will have the same structure and dtypes as cell.output_size. Otherwise emit_ta will have the same structure, shapes (prepended with a batch_size dimension), and dtypes as emit_output.
+      # If this first emit_output return value is None, then the emit_ta
+      # result of raw_rnn will have the same structure and dtypes as 
+      # cell.output_size. Otherwise emit_ta will have the same structure,
+      # shapes (prepended with a batch_size dimension), and dtypes as 
+      # emit_output.
       # so we needed to expand this so that its first dim is the batch size
       #emit_output = tf.expand_dims(loop_state,0)
       # this shouldn't be the case anymore...we should be able to directly do:
@@ -124,7 +134,7 @@ def build_generator(z_prior,
       # see above for the explanation of this soft-argmax
       next_word = tf.matmul(tf.nn.softmax(L*mul, axis=1), embeddings)
       #next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
-      next_loop_state = next_word_id
+      next_loop_state = (next_word_id, next_word)
       
     elements_finished = (time == max_sentence_length) # TODO this should be improved
         
@@ -134,10 +144,11 @@ def build_generator(z_prior,
   
   emit_ta, final_state, final_loop_state = tf.nn.raw_rnn(cell, loop_fn)
   
-  # rnn_outputs: [batch_size, sentence length, embedding size]
-  rnn_outputs = _transpose_batch_time(emit_ta.stack())
+  word_ids, words = emit_ta
   
-  return rnn_outputs, [V, Vb, C, Cb]
+  # must transpose first two dimensions from [sentence_length, batch_size] 
+  # to [batch_size, sentence_length]
+  return _transpose_batch_time(word_ids.stack()), _transpose_batch_time(words.stack()), [V, Vb, C, Cb]
 
   # TODO don't want to be using max sentence length here.
   # OR, at the very least, i want to be trimming down the sentences.
@@ -213,13 +224,13 @@ def build_discriminator(x_data, x_generated):
 state_size = 10
 z_prior = tf.placeholder(tf.float32, [batch_size, prior_size], name="z_prior")
 
-emit_ta, g_params = build_generator(z_prior, out_embeddings, state_size=10)
+x_generated_ids, x_generated, g_params = build_generator(z_prior, out_embeddings, state_size=10)
 
 # TODO i think my current gradient problem stems from here: we must output the generated embeddings
 # instead of the looked-up embeddings. but we also should output the word ids so we actually
 # know what the sentence was.
 # TODO this only works b/c everything in the emit_ta tensorarray is the same length.
-x_generated = tf.map_fn(lambda sentence: tf.map_fn(lambda word_id: tf.nn.embedding_lookup(out_embeddings, word_id), sentence, dtype=tf.float32), emit_ta, dtype=tf.float32)
+# x_generated = tf.map_fn(lambda sentence: tf.map_fn(lambda word_id: tf.nn.embedding_lookup(out_embeddings, word_id), sentence, dtype=tf.float32), emit_ta, dtype=tf.float32)
 
 x_data = tf.Variable(tf.zeros(dtype=tf.float32, shape=[batch_size, max_sentence_length, embedding_size]))
 
