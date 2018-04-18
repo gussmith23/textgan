@@ -57,7 +57,7 @@ def batch_gen():
   i = 0
   while i < len(all_sentences):
     # TODO this is a mess...
-    yield tf.stack([tf.pad(tf.stack([tf.nn.embedding_lookup(out_embeddings, id) for id in sentence[:max_sentence_length]]), [[0,max_sentence_length-len(sentence)],[0,0]], 'CONSTANT', constant_values=0) for sentence in all_sentences[i:batch_size]])
+    yield tf.stack([tf.pad(tf.stack([tf.nn.embedding_lookup(out_embeddings, id) for id in sentence[:max_sentence_length]]), [[0,max_sentence_length-min(len(sentence),max_sentence_length)],[0,0]], 'CONSTANT', constant_values=0) for sentence in all_sentences[i:i+batch_size]])
     i += batch_size
   
 def build_generator(z_prior,
