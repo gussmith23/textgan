@@ -238,23 +238,30 @@ x_data = tf.Variable(tf.zeros(dtype=tf.float32, shape=[batch_size, max_sentence_
 
 y_data, y_generated, d_params = build_discriminator(x_data, x_generated)
 
-d_loss = - (tf.log(y_data) + tf.log(1 - y_generated))
-g_loss = - tf.log(y_generated)
+d_loss = tf.reduce_mean(- (tf.log(y_data) + tf.log(1 - y_generated)))
+g_loss = tf.reduce_mean(- tf.log(y_generated))
+tf.summary.scalar("d_loss", d_loss)
+tf.summary.scalar("g_loss", g_loss)
+
 optimizer = tf.train.AdamOptimizer(0.0001)
 d_trainer = optimizer.minimize(d_loss, var_list=d_params)
 # TODO having problems with this -- no path to g_params
 g_trainer = optimizer.minimize(g_loss, var_list=g_params)
 
+merged_summary_op = tf.summary.merge_all()
+
 # TODO this is needed on Windows
 # https://stackoverflow.com/questions/41117740/tensorflow-crashes-with-cublas-status-alloc-failed?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
-
 with tf.Session(config=config) as sess:
-  init = tf.global_variables_initializer()	
+
+  # Credit to https://blog.altoros.com/visualizing-tensorflow-graphs-with-tensorboard.html
+  # for help with summaries.
   writer = tf.summary.FileWriter("output", sess.graph)
+
+  init = tf.global_variables_initializer()	
   sess.run(init)
-  writer.close()
   
   num_batches = len(all_sentences)//batch_size
   
@@ -273,7 +280,9 @@ with tf.Session(config=config) as sess:
     sess.run(x_data.assign(batch))
     
     sess.run(d_trainer, feed_dict={z_prior: z_value})
-    out_sentence, _ = sess.run([x_generated_ids, g_trainer], feed_dict={z_prior: z_value})
+    out_sentence, summary_str, _ = sess.run([x_generated_ids, merged_summary_op, g_trainer], feed_dict={z_prior: z_value})
     
+    writer.add_summary(summary_str, batch_i)
+
     tf.logging.debug("Generated sentences: {}".format("\n".join([" ".join([reversed_dictionary[word_id] for word_id in sentence]) for sentence in out_sentence])))
   
