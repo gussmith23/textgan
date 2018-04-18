@@ -136,8 +136,8 @@ def build_generator(z_prior,
       #next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
       next_loop_state = (next_word_id, next_word)
       
-    elements_finished = (time == max_sentence_length) # TODO this should be improved
-        
+    elements_finished = (time >= max_sentence_length) # TODO this should be improved
+       
     return (elements_finished, next_word, next_cell_state,
             emit_output, next_loop_state)
     
