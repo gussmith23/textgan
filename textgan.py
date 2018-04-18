@@ -34,6 +34,10 @@ batch_size = 16
 prior_size = 10
 end_of_sentence_id = 1 # TODO this should probably come from the data.
 
+# soft-argmax approximation (section 2.5 of zhang)
+# not sure what to set it to; they don't discuss.
+L = 100
+
 max_sentence_length = max([len(sentence) for sentences in data.values() for sentence in sentences])
 
 # Get embeddings. TODO i have no clue if this is a good way to do this...
@@ -41,8 +45,8 @@ embeddings = tf.Variable(-1.0, validate_shape=False, name=args.embeddings_tensor
 saver = tf.train.Saver()
 with tf.Session() as sess:
   saver.restore(sess, "log/embeddings_model.ckpt")
-  out_embeddings = sess.run([embeddings])
-  embedding_size = out_embeddings[0][0].shape[0]
+  out_embeddings = sess.run(embeddings)
+  embedding_size = out_embeddings[0].shape[0]
 
 def batch_gen():
   """
@@ -86,11 +90,22 @@ def build_generator(z_prior,
       tf.Assert(tf.shape(h1)[0] == batch_size and tf.shape(h1)[1] == state_size, [h1])
       next_cell_state = tf.contrib.rnn.LSTMStateTuple(c = init_state.c,
                                                       h = h1)
-      next_word_id = tf.argmax(tf.matmul(h1, V)+Vb, axis = 1)
+      # [batch_size, num_classes]
+      mul = tf.matmul(h1, V)+Vb
+      next_word_id = tf.argmax(mul, axis = 1)
+      # TODO used incorrectly -- has to be in the control chain or it won't run
       tf.Assert(tf.rank(next_word_id) == 1 and tf.shape(next_word_id)[0] == batch_size, [next_word_id])
       
-      next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
+      # section 2.5 of Zhang discusses this "soft-argmax". in simpler terms,
+      # this is needed because argmax has no gradient and thus breaks the path
+      # between the loss function and the variables V, Vb, etc.
+      # The other way is to use something like REINFORCE, but zhang thankfully
+      # proposes this simpler solution.
+      next_word = tf.matmul(tf.nn.softmax(L*mul, axis=1), embeddings)
+      # This is the old way
+      #next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
       # TODO i'm fairly certain this is the correct shape, but i'm not 100%
+      # TODO these don't work.
       tf.Assert(tf.rank(next_word) == 2, [next_word])
       tf.Assert(tf.shape(next_word)[0] == batch_size and tf.shape(next_word_id)[1] == embedding_size, [next_word])
 
@@ -104,8 +119,11 @@ def build_generator(z_prior,
       # this shouldn't be the case anymore...we should be able to directly do:
       emit_output = loop_state
       next_cell_state = cell_state
-      next_word_id = tf.argmax(tf.matmul(cell_state.h, V)+Vb, axis = 1)
-      next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
+      mul = tf.matmul(cell_state.h, V)+Vb
+      next_word_id = tf.argmax(mul, axis = 1)
+      # see above for the explanation of this soft-argmax
+      next_word = tf.matmul(tf.nn.softmax(L*mul, axis=1), embeddings)
+      #next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
       next_loop_state = next_word_id
       
     elements_finished = (time == max_sentence_length) # TODO this should be improved
@@ -197,6 +215,9 @@ z_prior = tf.placeholder(tf.float32, [batch_size, prior_size], name="z_prior")
 
 emit_ta, g_params = build_generator(z_prior, out_embeddings, state_size=10)
 
+# TODO i think my current gradient problem stems from here: we must output the generated embeddings
+# instead of the looked-up embeddings. but we also should output the word ids so we actually
+# know what the sentence was.
 # TODO this only works b/c everything in the emit_ta tensorarray is the same length.
 x_generated = tf.map_fn(lambda sentence: tf.map_fn(lambda word_id: tf.nn.embedding_lookup(out_embeddings, word_id), sentence, dtype=tf.float32), emit_ta, dtype=tf.float32)
 
@@ -209,7 +230,7 @@ g_loss = - tf.log(y_generated)
 optimizer = tf.train.AdamOptimizer(0.0001)
 d_trainer = optimizer.minimize(d_loss, var_list=d_params)
 # TODO having problems with this -- no path to g_params
-g_trainer = optimizer.minimize(g_loss, var_list=g_params)
+# g_trainer = optimizer.minimize(g_loss, var_list=g_params)
 
 with tf.Session() as sess:
   init = tf.global_variables_initializer()	
@@ -217,7 +238,6 @@ with tf.Session() as sess:
   sess.run(init)
   writer.close()
   
-  exit(0)
   
   for batch in batch_gen():
     tf.logging.set_verbosity(tf.logging.INFO)
@@ -231,7 +251,7 @@ with tf.Session() as sess:
     # gets fed in, in which case we need some reserved ID which should be
     # converted to padding instead of being looked up in the embeddings.
     sess.run(x_data.assign(batch))
-    out = sess.run(x_generated,
+    out = sess.run(d_trainer,
                     feed_dict={z_prior: z_value})
     print(out)
   
