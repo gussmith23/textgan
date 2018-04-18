@@ -200,8 +200,9 @@ def build_discriminator(x_data, x_generated):
   # TODO could make this an assert if you want...
   
   # pool1
-  pool1 = tf.nn.max_pool(conv1, ksize=[1, embedding_size, 1, 1], strides=[1, 1, 1, 1],
-                         padding='VALID', name='pool1')
+  pool1 = tf.reduce_max(conv1, axis=1)
+  # pool1 = tf.nn.max_pool(conv1, ksize=[1, tf.size(conv1)[1], 1, 1], strides=[1, 1, 1, 1],
+                         # padding='VALID', name='pool1')
 
   
   # TODO no dropout implemented yet
