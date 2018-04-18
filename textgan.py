@@ -156,8 +156,6 @@ def build_generator(z_prior,
   # to [batch_size, sentence_length]
   return _transpose_batch_time(word_ids.stack()), _transpose_batch_time(words.stack()), [V, Vb, C, Cb]
 
-  # TODO don't want to be using max sentence length here.
-  # OR, at the very least, i want to be trimming down the sentences.
 def build_discriminator(x_data, x_generated):
   """
   assuming that these come in as shape [batch_size, sentence_length, embedding_size]
