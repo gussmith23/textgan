@@ -244,7 +244,12 @@ d_trainer = optimizer.minimize(d_loss, var_list=d_params)
 # TODO having problems with this -- no path to g_params
 # g_trainer = optimizer.minimize(g_loss, var_list=g_params)
 
-with tf.Session() as sess:
+# TODO this is needed on Windows
+# https://stackoverflow.com/questions/41117740/tensorflow-crashes-with-cublas-status-alloc-failed?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+
+with tf.Session(config=config) as sess:
   init = tf.global_variables_initializer()	
   writer = tf.summary.FileWriter("output", sess.graph)
   sess.run(init)
