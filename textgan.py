@@ -243,7 +243,7 @@ g_loss = - tf.log(y_generated)
 optimizer = tf.train.AdamOptimizer(0.0001)
 d_trainer = optimizer.minimize(d_loss, var_list=d_params)
 # TODO having problems with this -- no path to g_params
-# g_trainer = optimizer.minimize(g_loss, var_list=g_params)
+g_trainer = optimizer.minimize(g_loss, var_list=g_params)
 
 # TODO this is needed on Windows
 # https://stackoverflow.com/questions/41117740/tensorflow-crashes-with-cublas-status-alloc-failed?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
@@ -271,7 +271,9 @@ with tf.Session(config=config) as sess:
     # gets fed in, in which case we need some reserved ID which should be
     # converted to padding instead of being looked up in the embeddings.
     sess.run(x_data.assign(batch))
-    out = sess.run(d_trainer,
-                    feed_dict={z_prior: z_value})
-    print(out)
+    
+    sess.run(d_trainer, feed_dict={z_prior: z_value})
+    out_sentence, _ = sess.run([x_generated_ids, g_trainer], feed_dict={z_prior: z_value})
+    
+    tf.logging.debug("Generated sentences: {}".format("\n".join([" ".join([reversed_dictionary[word_id] for word_id in sentence]) for sentence in out_sentence])))
   
