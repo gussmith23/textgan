@@ -176,11 +176,9 @@ def build_discriminator(x_data, x_generated):
   # x_generated.set_shape([batch_size,max_sentence_length,embedding_size])
     
   # concatenate batches
-  assert_same_size = tf.Assert(tf.shape(x_data) == tf.shape(x_generated), [tf.shape(x_data), tf.shape(x_generated)])
-  with tf.control_dependencies([assert_same_size]):
-    x_in = tf.concat([x_data, x_generated], 0) 
-    x_in = tf.expand_dims(x_in,3) # add channel dimension
-    assert(x_in.get_shape().as_list() == [2*batch_size, max_sentence_length, embedding_size, 1])
+  x_in = tf.concat([x_data, x_generated], 0) 
+  x_in = tf.expand_dims(x_in,3) # add channel dimension
+  assert(x_in.get_shape().as_list() == [2*batch_size, max_sentence_length, embedding_size, 1])
   
   # building the CNN with help from
   # - Kim 2014 (which describes the CNN)
