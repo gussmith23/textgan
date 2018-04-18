@@ -202,13 +202,22 @@ x_generated = tf.map_fn(lambda sentence: tf.map_fn(lambda word_id: tf.nn.embeddi
 
 x_data = tf.Variable(tf.zeros(dtype=tf.float32, shape=[batch_size, max_sentence_length, embedding_size]))
 
-softmax = build_discriminator(x_data, x_generated)
+y_data, y_generated, d_params = build_discriminator(x_data, x_generated)
+
+d_loss = - (tf.log(y_data) + tf.log(1 - y_generated))
+g_loss = - tf.log(y_generated)
+optimizer = tf.train.AdamOptimizer(0.0001)
+d_trainer = optimizer.minimize(d_loss, var_list=d_params)
+# TODO having problems with this -- no path to g_params
+g_trainer = optimizer.minimize(g_loss, var_list=g_params)
 
 with tf.Session() as sess:
-  init = tf.global_variables_initializer()
+  init = tf.global_variables_initializer()	
+  writer = tf.summary.FileWriter("output", sess.graph)
   sess.run(init)
+  writer.close()
   
-  all_sentences = reduce(operator.add, data.values(), [])
+  exit(0)
   
   for batch in batch_gen():
     tf.logging.set_verbosity(tf.logging.INFO)
@@ -222,7 +231,7 @@ with tf.Session() as sess:
     # gets fed in, in which case we need some reserved ID which should be
     # converted to padding instead of being looked up in the embeddings.
     sess.run(x_data.assign(batch))
-    out = sess.run(softmax,
+    out = sess.run(x_generated,
                     feed_dict={z_prior: z_value})
     print(out)
   
