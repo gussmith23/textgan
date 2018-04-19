@@ -46,6 +46,10 @@ def parse_data():
           
           # TODO i was still having some single-word sentences slip through. this is a temporary fix.
           new_sentences = list(filter(lambda s: len(s)>1, new_sentences))
+          # TODO this is also temporary AND inefficient, but i just wanted to
+          # make it explicitly clear what's going on: I need to filter
+          # out short messages also. I arbitrarily choose 5 here.
+          new_sentences = list(filter(lambda s: len(s)>5, new_sentences))
           
           if (sender in sentences_by_sender): sentences_by_sender[sender].extend(new_sentences)
           else: sentences_by_sender[sender] = new_sentences
