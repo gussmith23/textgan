@@ -9,7 +9,7 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
   assuming that these come in as shape [batch_size, sentence_length, embedding_size]
   all sentences must be padded to the same length.
   """
-    
+
     with tf.variable_scope('discriminator') as function_scope:
 
         # concatenate batches
@@ -36,7 +36,8 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
             conv1_bias = tf.Variable(
                 tf.random_normal([num_filters]),
                 name="bias")  # TODO initialize to zero?
-            conv = tf.nn.conv2d(x_in, conv1_filter, [1, 1, 1, 1], padding='VALID')
+            conv = tf.nn.conv2d(
+                x_in, conv1_filter, [1, 1, 1, 1], padding='VALID')
             conv += conv1_bias
 
             # TODO the paper uses tanh, but TF loves RELU; could try both.
@@ -58,14 +59,19 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
             # TODO can this be computed statically? i think it can, i'm just too lazy to do it right now.
             dim = tf.shape(reshape)[1]
             fc_weights = tf.Variable(
-                tf.random_normal([dim, 2]), validate_shape=False, name="weights")
+                tf.random_normal([dim, 2]),
+                validate_shape=False,
+                name="weights")
             fc_bias = tf.Variable(
                 tf.random_normal([2]), name="bias")  # TODO initialize to zero?
             fc = tf.matmul(reshape, fc_weights) + fc_bias
             fc = tf.identity(fc, name=scope.name)
 
-        y_data = tf.nn.softmax(tf.slice(fc, [0, 0], [batch_size, -1], name=None))
+        y_data = tf.nn.softmax(
+            tf.slice(fc, [0, 0], [batch_size, -1], name=None))
         y_generated = tf.nn.softmax(
             tf.slice(fc, [batch_size, 0], [-1, -1], name=None))
 
-        return y_data, y_generated, [conv1_filter, conv1_bias, fc_weights, fc_bias]
+        return y_data, y_generated, [
+            conv1_filter, conv1_bias, fc_weights, fc_bias
+        ]
