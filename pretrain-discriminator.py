@@ -29,6 +29,7 @@ parser.add_argument(
     '--dataset-name', type=str, required=True, help='name of dataset')
 parser.add_argument('--max-epoch', type=int, default=100)
 parser.add_argument('--batch-size', type=int, default=32)
+parser.add_argument('--learning-rate', type=float, default=0.00001)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -127,7 +128,7 @@ d_loss = tf.reduce_mean(
             [[1, 0]] * batch_size + [[0, 1]] * batch_size, dtype=tf.float32)))
 tf.summary.scalar("d_loss", d_loss)
 
-optimizer = tf.train.AdamOptimizer(0.0001)
+optimizer = tf.train.AdamOptimizer(args.learning_rate)
 d_trainer = optimizer.minimize(d_loss, var_list=d_params)
 
 merged_summary_op = tf.summary.merge_all()
