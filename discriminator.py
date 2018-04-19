@@ -28,26 +28,50 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
             # height is the number of words we want, while width should be the size of the embedding (always).
             # from Kim 2014: filter windows (h) of 3, 4, 5 with 100 feature maps each
             # TODO how do i handle 3, 4, and 5 simultaneously? can i?
-            num_words = 3
-            num_filters = 100
-            conv1_filter = tf.Variable(
-                tf.random_normal([num_words, embedding_size, 1, num_filters]),
-                name="weights")
+            num_filters = 300
+            conv1_filter_3 = tf.Variable(
+                tf.random_normal([3, embedding_size, 1, num_filters]),
+                name="weights_3")
+            conv1_filter_4 = tf.Variable(
+                tf.random_normal([4, embedding_size, 1, num_filters]),
+                name="weights_4")
+            conv1_filter_5 = tf.Variable(
+                tf.random_normal([5, embedding_size, 1, num_filters]),
+                name="weights_5")
+            # TODO should each set of weights have its own bias?
             conv1_bias = tf.Variable(
                 tf.random_normal([num_filters]),
                 name="bias")  # TODO initialize to zero?
-            conv = tf.nn.conv2d(
-                x_in, conv1_filter, [1, 1, 1, 1], padding='VALID')
-            conv += conv1_bias
+
+            # TODO we probably shouldn't have sentences of less than length 3, if we're doing this.
+            conv_3 = tf.nn.conv2d(
+                x_in, conv1_filter_3, [1, 1, 1, 1], padding='VALID')
+            conv_4 = tf.nn.conv2d(
+                x_in, conv1_filter_4, [1, 1, 1, 1], padding='VALID')
+            conv_5 = tf.nn.conv2d(
+                x_in, conv1_filter_5, [1, 1, 1, 1], padding='VALID')
+
+            conv_3 += conv1_bias
+            conv_4 += conv1_bias
+            conv_5 += conv1_bias
 
             # TODO the paper uses tanh, but TF loves RELU; could try both.
-            conv1 = tf.nn.tanh(conv, name=scope.name)
+            conv1_3 = tf.nn.tanh(conv_3, name=scope.name + "_3")
+            conv1_4 = tf.nn.tanh(conv_4, name=scope.name + "_4")
+            conv1_5 = tf.nn.tanh(conv_5, name=scope.name + "_5")
 
         # conv1 should be shape [batch_size, sentence_length - (num_words-1), 1, num_filters]
         # TODO could make this an assert if you want...
 
         # pool1
-        pool1 = tf.reduce_max(conv1, axis=1)
+        # the output of reduce_max is [2*batch_size,1,num_filters]. we concat along the filters axis.
+        pool1 = tf.concat(
+            [
+                tf.reduce_max(conv1_3, axis=1),
+                tf.reduce_max(conv1_4, axis=1),
+                tf.reduce_max(conv1_5, axis=1)
+            ],
+            axis=2)
         # pool1 = tf.nn.max_pool(conv1, ksize=[1, tf.size(conv1)[1], 1, 1], strides=[1, 1, 1, 1],
         # padding='VALID', name='pool1')
 
@@ -67,13 +91,17 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
             fc = tf.matmul(reshape, fc_weights) + fc_bias
             fc = tf.identity(fc, name=scope.name)
 
-        y_data = tf.slice(
-            tf.nn.softmax(tf.slice(fc, [0, 0], [batch_size, -1], name=None)),
-            [0, 0], [-1, 1])
-        y_generated = tf.slice(
-            tf.nn.softmax(tf.slice(fc, [batch_size, 0], [-1, -1], name=None)),
-            [0, 0], [-1, 1])
+        logits_data = tf.slice(fc, [0, 0], [batch_size, -1], name=None)
+        logits_generated = tf.slice(fc, [batch_size, 0], [-1, -1], name=None)
 
-        return y_data, y_generated, [
-            conv1_filter, conv1_bias, fc_weights, fc_bias
+        # y_data = tf.slice(
+        # tf.nn.softmax(tf.slice(fc, [0, 0], [batch_size, -1], name=None)),
+        # [0, 0], [-1, 1])
+        # y_generated = tf.slice(
+        # tf.nn.softmax(tf.slice(fc, [batch_size, 0], [-1, -1], name=None)),
+        # [0, 0], [-1, 1])
+
+        return logits_data, logits_generated, [
+            conv1_filter_3, conv1_filter_4, conv1_filter_5, conv1_bias,
+            fc_weights, fc_bias
         ]

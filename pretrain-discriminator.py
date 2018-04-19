@@ -116,10 +116,15 @@ x_data = tf.placeholder(
 x_data_tweaked = tf.placeholder(
     dtype=tf.float32, shape=[batch_size, sentence_length, embedding_size])
 
-y_data, y_data_tweaked, d_params = build_discriminator(
+logits_data, logits_tweaked, d_params = build_discriminator(
     x_data, x_data_tweaked, batch_size, sentence_length, embedding_size)
 
-d_loss = tf.reduce_mean(-(tf.log(y_data) + tf.log(1 - y_data_tweaked)))
+#d_loss = tf.reduce_mean(-(tf.log(y_data) + tf.log(1 - y_data_tweaked)))
+d_loss = tf.reduce_mean(
+    tf.nn.sigmoid_cross_entropy_with_logits(
+        logits=tf.concat([logits_data, logits_tweaked], axis=0),
+        labels=tf.constant(
+            [[1, 0]] * batch_size + [[0, 1]] * batch_size, dtype=tf.float32)))
 tf.summary.scalar("d_loss", d_loss)
 
 optimizer = tf.train.AdamOptimizer(0.0001)
