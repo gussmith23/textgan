@@ -43,6 +43,10 @@ def parse_data():
           new_sentences = util.sentences.split_and_clean_sentences(message)
           # Split each sentence into words
           new_sentences = list(map(util.sentences.sentence_to_words, new_sentences))
+          
+          # TODO i was still having some single-word sentences slip through. this is a temporary fix.
+          new_sentences = list(filter(lambda s: len(s)>1, new_sentences))
+          
           if (sender in sentences_by_sender): sentences_by_sender[sender].extend(new_sentences)
           else: sentences_by_sender[sender] = new_sentences
         
