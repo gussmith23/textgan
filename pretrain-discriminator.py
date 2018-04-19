@@ -83,7 +83,10 @@ def batch_gen():
         # tweak
         for sentence in tweaked_sentences:
             # TODO this is non-ideal. we shouldn't add tweaked sentences that
-            # aren't actually tweaked.
+            # aren't actually tweaked, and you can't tweak a sentence that has
+            # only one word.
+            # I've eliminated this problem for now by filtering out really
+            # short messages.
             if len(sentence) < 2:
                 tf.logging.debug(
                     "Adding sentence of length {} into tweaked sentences...this is non-ideal; see TODO".
