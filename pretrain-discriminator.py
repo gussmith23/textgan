@@ -90,7 +90,10 @@ def batch_gen():
                     format(len(sentence)))
                 continue
             # nice code from https://stackoverflow.com/questions/47724017
-            idx = range(len(sentence))
+            # note the [:-1]. this is so that we don't swap the END token.
+            # TODO i'm not sure if this is actually helpful, but I have a
+            # hunch it is.
+            idx = range(len(sentence))[:-1]
             i1, i2 = random.sample(idx, 2)
             sentence[i1], sentence[i2] = sentence[i2], sentence[i1]
 
