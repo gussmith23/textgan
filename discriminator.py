@@ -67,10 +67,12 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
             fc = tf.matmul(reshape, fc_weights) + fc_bias
             fc = tf.identity(fc, name=scope.name)
 
-        y_data = tf.nn.softmax(
-            tf.slice(fc, [0, 0], [batch_size, -1], name=None))
-        y_generated = tf.nn.softmax(
-            tf.slice(fc, [batch_size, 0], [-1, -1], name=None))
+        y_data = tf.slice(
+            tf.nn.softmax(tf.slice(fc, [0, 0], [batch_size, -1], name=None)),
+            [0, 0], [-1, 1])
+        y_generated = tf.slice(
+            tf.nn.softmax(tf.slice(fc, [batch_size, 0], [-1, -1], name=None)),
+            [0, 0], [-1, 1])
 
         return y_data, y_generated, [
             conv1_filter, conv1_bias, fc_weights, fc_bias
