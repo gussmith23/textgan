@@ -9,6 +9,7 @@ import operator
 from functools import reduce
 import random
 import argparse
+import numpy as np
 
 tf.logging.set_verbosity(tf.logging.DEBUG)
 
@@ -26,7 +27,8 @@ parser.add_argument(
     help='name of the embeddings tensor')
 parser.add_argument(
     '--dataset-name', type=str, required=True, help='name of dataset')
-parser.add_argument('--max-epoch', type=int, default=10)
+parser.add_argument('--max-epoch', type=int, default=100)
+parser.add_argument('--batch-size', type=int, default=32)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -34,11 +36,9 @@ data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictio
     dataset_name)
 num_classes = len(dictionary)
 all_sentences = reduce(operator.add, data.values(), [])
-batch_size = 8
-prior_size = 10
+batch_size = args.batch_size
 end_of_sentence_id = 1  # TODO this should probably come from the data.
-sentence_length = 20
-max_epochs = 100
+sentence_length = 30
 
 # Get embeddings. TODO i have no clue if this is a good way to do this...
 embeddings = tf.Variable(
@@ -61,58 +61,59 @@ def batch_gen():
     # While there are enough sentences left.
     # TODO could be cleaner?
     while len(all_sentences) - i >= 2 * batch_size:
-
-        # get sentences, truncate to correct length.
-        tweaked_sentences = [
-            sentence[:sentence_length]
-            for sentence in all_sentences[i:i + batch_size]
-        ]
-        i += batch_size
-
+    
+        tweaked_sentences, pure_sentences = [], []
+        
+        for sentence in all_sentences[i:i + 2*batch_size]:
+            if len(sentence) > 2 and len(tweaked_sentences) < batch_size:
+                tweaked_sentences.append(sentence[:sentence_length])
+            elif len(pure_sentences) < batch_size:
+                pure_sentences.append(sentence[:sentence_length])
+            else:
+                # In this case we assume it's a 1-word sentence but pure_sentences
+                # is already full.
+                # TODO this batch creation is still non-ideal.
+                tweaked_sentences.append(sentence[:sentence_length])
+                
+        assert(len(pure_sentences) == batch_size)
+        assert(len(tweaked_sentences) == batch_size)
+        i += 2*batch_size
+        
         # tweak
         for sentence in tweaked_sentences:
+            # TODO this is non-ideal. we shouldn't add tweaked sentences that
+            # aren't actually tweaked.
+            if len(sentence) < 2: 
+                tf.logging.debug("Adding sentence of length {} into tweaked sentences...this is non-ideal; see TODO".format(len(sentence)))
+                continue
             # nice code from https://stackoverflow.com/questions/47724017
             idx = range(len(sentence))
             i1, i2 = random.sample(idx, 2)
             sentence[i1], sentence[i2] = sentence[i2], sentence[i1]
-
-        # get sentences, truncate to correct length.
-        pure_sentences = [
-            sentence[:sentence_length]
-            for sentence in all_sentences[i:i + batch_size]
-        ]
-        i += batch_size
-
+        
         # TODO this is a mess...
-        yield tf.stack([
-            tf.pad(
-                tf.stack([
-                    tf.nn.embedding_lookup(embeddings, id) for id in sentence
+        yield np.stack([
+            np.pad(
+                np.stack([
+                    embeddings[id] for id in sentence
                 ]),
                 [[0, sentence_length - min(len(sentence), sentence_length)],
                  [0, 0]],
-                'CONSTANT',
+                'constant',
                 constant_values=0) for sentence in pure_sentences
-        ]), tf.stack([
-            tf.pad(
-                tf.stack([
-                    tf.nn.embedding_lookup(embeddings, id) for id in sentence
+        ]), np.stack([
+            np.pad(
+                np.stack([
+                    embeddings[id] for id in sentence
                 ]),
                 [[0, sentence_length - min(len(sentence), sentence_length)],
                  [0, 0]],
-                'CONSTANT',
+                'constant',
                 constant_values=0) for sentence in tweaked_sentences
         ])
 
-        i += batch_size
-
-
-x_data = tf.Variable(
-    tf.zeros(
-        dtype=tf.float32, shape=[batch_size, sentence_length, embedding_size]))
-x_data_tweaked = tf.Variable(
-    tf.zeros(
-        dtype=tf.float32, shape=[batch_size, sentence_length, embedding_size]))
+x_data = tf.placeholder(dtype=tf.float32, shape=[batch_size, sentence_length, embedding_size])
+x_data_tweaked = tf.placeholder(dtype=tf.float32, shape=[batch_size, sentence_length, embedding_size])
 
 y_data, y_data_tweaked, d_params = build_discriminator(
     x_data, x_data_tweaked, batch_size, sentence_length, embedding_size)
@@ -144,31 +145,38 @@ with tf.Session(config=config) as sess:
     sess.run(init_g)
     sess.run(init_l)
 
-    num_batches = len(all_sentences) // batch_size
+    # TODO batch size is actually batch_size*2
+    num_batches = len(all_sentences) // batch_size*2
 
     tf.logging.info("Beginnning training.")
 
     for epoch in range(args.max_epoch):
+        tf.logging.info("Epoch: {}/{}".format(epoch+1,args.max_epoch))
         for batch_i, (pure_sentences, tweaked_sentences) in enumerate(
                 batch_gen()):
-            tf.logging.info("Epoch: {}/{}\tBatch: {}/{}".format(
-                epoch + 1, args.max_epoch, batch_i + 1, num_batches))
-
+            
             # TODO this is kind of messy. basically, batch_gen() returns tensors, which
             # must be "fed" through these assign call here. batch_gen() has to return a
             # tensor because i'm not sure how else to feed sentences in.
             # if we feed just IDs, then each sentence has to be padded already when it
             # gets fed in, in which case we need some reserved ID which should be
             # converted to padding instead of being looked up in the embeddings.
-            sess.run(x_data.assign(pure_sentences))
-            sess.run(x_data_tweaked.assign(tweaked_sentences))
-
-            summary_str = sess.run(merged_summary_op)
-
-            writer.add_summary(summary_str, batch_i)
+            # sess.run(x_data.assign(pure_sentences))
+            # sess.run(x_data_tweaked.assign(tweaked_sentences))
+            
+            # Alright, I fixed my big issue with training crashing. the problem
+            # was with the fact that we were using tf calls in the generator,
+            # which creates new nodes.
 
             step = epoch * num_batches + batch_i
-            if step % 10 == 0:
+            
+            summary_str = sess.run(merged_summary_op, feed_dict={
+                x_data:pure_sentences, x_data_tweaked:tweaked_sentences
+                })
+                
+            writer.add_summary(summary_str, step)
+
+            if step % 1000 == 0:
                 # TODO hardcoded path.
                 # TODO this is weird, i don't like how the output is done here.
                 saver.save(
