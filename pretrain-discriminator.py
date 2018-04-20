@@ -28,8 +28,17 @@ parser.add_argument(
 parser.add_argument(
     '--dataset-name', type=str, required=True, help='name of dataset')
 parser.add_argument('--max-epoch', type=int, default=100)
-parser.add_argument('--batch-size', type=int, default=32)
-parser.add_argument('--learning-rate', type=float, default=0.00001)
+# This is specified in Zhang 2017.
+parser.add_argument('--batch-size', type=int, default=256)
+# This is specified in Zhang 2017.
+parser.add_argument('--learning-rate', type=float, default=0.00005)
+parser.add_argument(
+    '--checkpoint-dir',
+    type=str,
+    required=False,
+    help=
+    'directory containing latest checkpoint. if this flag is set, the model will be restored from this location.'
+)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -87,18 +96,23 @@ def batch_gen():
             # only one word.
             # I've eliminated this problem for now by filtering out really
             # short messages.
-            if len(sentence) < 2:
-                tf.logging.debug(
+            if len(sentence) < 5:
+                tf.logging.warn(
                     "Adding sentence of length {} into tweaked sentences...this is non-ideal; see TODO".
                     format(len(sentence)))
                 continue
             # nice code from https://stackoverflow.com/questions/47724017
+            # though we've modified it heavily.
             # note the [:-1]. this is so that we don't swap the END token.
             # TODO i'm not sure if this is actually helpful, but I have a
             # hunch it is.
+            # We actually permute MORE than they do in Zhang. We shuffle more words.
             idx = range(len(sentence))[:-1]
-            i1, i2 = random.sample(idx, 2)
-            sentence[i1], sentence[i2] = sentence[i2], sentence[i1]
+            idxs = random.sample(idx, 4)
+            shuffled_idxs = idxs[:]
+            random.shuffle(shuffled_idxs)
+            for i1, i2 in zip(idxs, shuffled_idxs):
+                sentence[i1], sentence[i2] = sentence[i2], sentence[i1]
 
         # TODO this is a mess...
         yield np.stack([
@@ -123,8 +137,10 @@ x_data = tf.placeholder(
 x_data_tweaked = tf.placeholder(
     dtype=tf.float32, shape=[batch_size, sentence_length, embedding_size])
 
-logits_data, logits_tweaked, d_params = build_discriminator(
+logits_data, logits_tweaked, embedding_data, embedding_tweaked, d_params = build_discriminator(
     x_data, x_data_tweaked, batch_size, sentence_length, embedding_size)
+
+global_step = tf.Variable(0, name='global_step', trainable=False)
 
 #d_loss = tf.reduce_mean(-(tf.log(y_data) + tf.log(1 - y_data_tweaked)))
 d_loss = tf.reduce_mean(
@@ -135,20 +151,31 @@ d_loss = tf.reduce_mean(
 tf.summary.scalar("d_loss", d_loss)
 
 optimizer = tf.train.AdamOptimizer(args.learning_rate)
-d_trainer = optimizer.minimize(d_loss, var_list=d_params)
+d_trainer = optimizer.minimize(
+    d_loss, var_list=d_params, global_step=global_step)
 
 merged_summary_op = tf.summary.merge_all()
 
 init_g = tf.global_variables_initializer()
 init_l = tf.local_variables_initializer()
 
-saver = tf.train.Saver()
+# The first saver is for saving/restoring for pretraining.
+# The second saver is for restoring the weights for use in other networks.
+saver_all = tf.train.Saver()
+saver_just_weights_and_biases = tf.train.Saver(
+    var_list=tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator"))
 
 # TODO this is needed on Windows
 # https://stackoverflow.com/questions/41117740/tensorflow-crashes-with-cublas-status-alloc-failed?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 with tf.Session(config=config) as sess:
+
+    if args.checkpoint_dir is not None:
+        tf.logging.info("Restoring from {}".format(args.checkpoint_dir))
+        saver_all.restore(sess, tf.train.latest_checkpoint(
+            args.checkpoint_dir))
 
     # Credit to https://blog.altoros.com/visualizing-tensorflow-graphs-with-tensorboard.html
     # for help with summaries.
@@ -195,7 +222,11 @@ with tf.Session(config=config) as sess:
             if step % 1000 == 0:
                 # TODO hardcoded path.
                 # TODO this is weird, i don't like how the output is done here.
-                saver.save(
+                saver_all.save(
                     sess,
                     './pretrain-discriminator/pretrain-discriminator',
-                    global_step=step)
+                    global_step=global_step.eval())
+                saver_just_weights_and_biases.save(
+                    sess,
+                    './pretrain-discriminator-weights-biases/pretrain-discriminator-weights-biases',
+                    global_step=global_step.eval())

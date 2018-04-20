@@ -77,22 +77,79 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
 
         # TODO no dropout implemented yet
 
-        with tf.variable_scope('fc') as scope:
-            # Move everything into depth so we can perform a single matrix multiply.
-            reshape = tf.reshape(pool1, [x_in.get_shape().as_list()[0], -1])
-            # TODO can this be computed statically? i think it can, i'm just too lazy to do it right now.
-            dim = tf.shape(reshape)[1]
-            fc_weights = tf.Variable(
-                tf.random_normal([dim, 2]),
+        # As described in Zhang 2017, when we get to this point we have the
+        # sentence represented as a 900-dimensional feature vector. We now
+        # branch in two directions:
+        # - The discriminator goes through a 900-200-2 fc layers.
+        # - The encoder goes through 900-900-900 fc layers to produce the
+        #       latent representation z.
+        #       TODO I need to describe this latent representation.
+        # TODO i'm not sure if this means we do 900->900->200->2 or if we
+        # just do 900->200->2. I'll assume the latter b/c of hardware
+        # constraints.
+
+        # Move everything into depth so we can perform a single matrix multiply.
+        reshape = tf.reshape(pool1, [x_in.get_shape().as_list()[0], -1])
+        reshape = tf.sigmoid(reshape)
+        # TODO can this be computed statically? i think it can, i'm just too lazy to do it right now.
+        dim = tf.shape(reshape)[1]
+
+        with tf.variable_scope('discriminator_fc_1') as scope:
+            d_fc_1_weights = tf.Variable(
+                tf.random_normal([dim, 200]),
                 validate_shape=False,
                 name="weights")
-            fc_bias = tf.Variable(
-                tf.random_normal([2]), name="bias")  # TODO initialize to zero?
-            fc = tf.matmul(reshape, fc_weights) + fc_bias
-            fc = tf.identity(fc, name=scope.name)
+            d_fc_1_bias = tf.Variable(
+                tf.random_normal([200]),
+                name="bias")  # TODO initialize to zero?
+            d_fc_1 = tf.sigmoid(
+                tf.matmul(reshape, d_fc_1_weights) + d_fc_1_bias)
+            d_fc_1 = tf.identity(d_fc_1, name=scope.name)
 
-        logits_data = tf.slice(fc, [0, 0], [batch_size, -1], name=None)
-        logits_generated = tf.slice(fc, [batch_size, 0], [-1, -1], name=None)
+        with tf.variable_scope('discriminator_fc_2') as scope:
+            d_fc_2_weights = tf.Variable(
+                tf.random_normal([200, 2]),
+                validate_shape=False,
+                name="weights")
+            d_fc_2_bias = tf.Variable(
+                tf.random_normal([2]), name="bias")  # TODO initialize to zero?
+            d_fc_2 = tf.matmul(d_fc_1, d_fc_2_weights) + d_fc_2_bias
+            d_fc_2 = tf.identity(d_fc_2, name=scope.name)
+
+        with tf.variable_scope('encoder_fc_1') as scope:
+            e_fc_1_weights = tf.Variable(
+                tf.random_normal([dim, 900]),
+                validate_shape=False,
+                name="weights")
+            e_fc_1_bias = tf.Variable(
+                tf.random_normal([900]),
+                name="bias")  # TODO initialize to zero?
+            e_fc_1 = tf.sigmoid(
+                tf.matmul(reshape, e_fc_1_weights) + e_fc_1_bias)
+            e_fc_1 = tf.identity(e_fc_1, name=scope.name)
+
+        with tf.variable_scope('encoder_fc_2') as scope:
+            e_fc_2_weights = tf.Variable(
+                tf.random_normal([900, 900]),
+                validate_shape=False,
+                name="weights")
+            e_fc_2_bias = tf.Variable(
+                tf.random_normal([2]), name="bias")  # TODO initialize to zero?
+            e_fc_2 = tf.matmul(e_fc_1, e_fc_2_weights) + e_fc_2_bias
+            e_fc_2 = tf.identity(e_fc_2, name=scope.name)
+
+        # Note that we don't do softmax on these. In our pre-training setup,
+        # we use softmax_cross_entropy_on_logits or whatever it's called,
+        # which expects to do softmax itself. Presumably computing softmax
+        # twice wouldn't be a problem, but whatever.
+        logits_data = tf.slice(d_fc_2, [0, 0], [batch_size, -1], name=None)
+        logits_generated = tf.slice(
+            d_fc_2, [batch_size, 0], [-1, -1], name=None)
+
+        encoding_data = tf.tanh(
+            tf.slice(e_fc_2, [0, 0], [batch_size, -1], name=None))
+        encoding_generated = tf.tanh(
+            tf.slice(e_fc_2, [batch_size, 0], [-1, -1], name=None))
 
         # y_data = tf.slice(
         # tf.nn.softmax(tf.slice(fc, [0, 0], [batch_size, -1], name=None)),
@@ -101,7 +158,8 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
         # tf.nn.softmax(tf.slice(fc, [batch_size, 0], [-1, -1], name=None)),
         # [0, 0], [-1, 1])
 
-        return logits_data, logits_generated, [
+        return logits_data, logits_generated, encoding_data, encoding_generated, [
             conv1_filter_3, conv1_filter_4, conv1_filter_5, conv1_bias,
-            fc_weights, fc_bias
+            d_fc_1_weights, d_fc_1_bias, d_fc_2_weights, d_fc_2_bias,
+            e_fc_1_weights, e_fc_1_bias, e_fc_2_weights, e_fc_2_bias
         ]
