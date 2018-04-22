@@ -151,7 +151,7 @@ with graph.as_default():
         optimizer = tf.train.AdamOptimizer().minimize(
             loss, global_step=global_step)
 
-    norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1, keep_dims=True))
+    norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1, keepdims=True))
     normalized_embeddings = tf.Variable(
         embeddings / norm, name='normalized_embeddings')
 
