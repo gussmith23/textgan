@@ -175,7 +175,10 @@ with tf.Session(graph=graph) as session:
                 # os.path.join(args.checkpoint_dir, 'embeddings'),
                 # global_step=tf.train.global_step(session, global_step))
                 # Save embeddings by pickling, not by checkpointing.
-                with open("embeddings-cbow-{}.p".format(
-                        tf.train.global_step(session, global_step)),
-                          "wb") as f:
-                    pickle.dump(final_embeddings, f)
+                with open(
+                        os.path.join(args.checkpoint_dir,
+                                     "embeddings-skip-gram-{}.p".format(
+                                         tf.train.global_step(
+                                             session, global_step))),
+                        "wb") as f:
+                    pickle.dump(normalized_embeddings.eval(), f)
