@@ -10,6 +10,7 @@ from functools import reduce
 import random
 import argparse
 import numpy as np
+import os
 
 tf.logging.set_verbosity(tf.logging.DEBUG)
 
@@ -20,11 +21,6 @@ parser.add_argument(
     type=str,
     required=True,
     help='filepath of the embeddings file to use')
-parser.add_argument(
-    '--embeddings-tensor-name',
-    type=str,
-    required=True,
-    help='name of the embeddings tensor')
 parser.add_argument(
     '--dataset-name', type=str, required=True, help='name of dataset')
 parser.add_argument('--max-epoch', type=int, default=100)
@@ -37,7 +33,8 @@ parser.add_argument(
     type=str,
     required=False,
     help=
-    'directory containing latest checkpoint. if this flag is set, the model will be restored from this location.'
+    'directory containing latest checkpoint. if this flag is set, the model will be restored from this location.',
+    default="pretrain-discriminator"
 )
 args = parser.parse_args()
 
@@ -51,12 +48,9 @@ end_of_sentence_id = 1  # TODO this should probably come from the data.
 sentence_length = 30
 
 # Get embeddings. TODO i have no clue if this is a good way to do this...
-embeddings = tf.Variable(
-    -1.0, validate_shape=False, name=args.embeddings_tensor_name)
-with tf.Session() as sess:
-    tf.train.Saver().restore(sess, args.embeddings_file)
-    embeddings = sess.run(embeddings)
-    embedding_size = embeddings.shape[1]
+with open(args.embeddings_file, "rb") as f:
+    embeddings = np.load(f)
+embedding_size = embeddings.shape[1]
 
 
 # TODO though we call it "batch_size", the real batch size is 2*batch_size.
@@ -172,10 +166,11 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 with tf.Session(config=config) as sess:
 
-    if args.checkpoint_dir is not None:
-        tf.logging.info("Restoring from {}".format(args.checkpoint_dir))
-        saver_all.restore(sess, tf.train.latest_checkpoint(
-            args.checkpoint_dir))
+    # TODO use --restore flag
+    # if args.checkpoint_dir is not None:
+        # tf.logging.info("Restoring from {}".format(args.checkpoint_dir))
+        # saver_all.restore(sess, tf.train.latest_checkpoint(
+            # args.checkpoint_dir))
 
     # Credit to https://blog.altoros.com/visualizing-tensorflow-graphs-with-tensorboard.html
     # for help with summaries.
@@ -220,13 +215,11 @@ with tf.Session(config=config) as sess:
             writer.add_summary(summary_str, step)
 
             if step % 1000 == 0:
-                # TODO hardcoded path.
-                # TODO this is weird, i don't like how the output is done here.
                 saver_all.save(
                     sess,
-                    './pretrain-discriminator/pretrain-discriminator',
+                    os.path.join('.', args.checkpoint_dir, 'model'),
                     global_step=global_step.eval())
                 saver_just_weights_and_biases.save(
                     sess,
-                    './pretrain-discriminator-weights-biases/pretrain-discriminator-weights-biases',
+                    os.path.join('.', args.checkpoint_dir, 'weights-biases'),
                     global_step=global_step.eval())
