@@ -180,9 +180,6 @@ with tf.Session(config=config) as sess:
     sess.run(init_g)
     sess.run(init_l)
 
-    # TODO batch size is actually batch_size*2
-    num_batches = len(all_sentences) // batch_size * 2
-
     tf.logging.info("Beginnning training.")
 
     for epoch in range(args.max_epoch):
@@ -203,8 +200,6 @@ with tf.Session(config=config) as sess:
             # was with the fact that we were using tf calls in the generator,
             # which creates new nodes.
 
-            step = epoch * num_batches + batch_i
-
             summary_str = sess.run(
                 merged_summary_op,
                 feed_dict={
@@ -212,14 +207,14 @@ with tf.Session(config=config) as sess:
                     x_data_tweaked: tweaked_sentences
                 })
 
-            writer.add_summary(summary_str, step)
+            writer.add_summary(summary_str, tf.train.global_step(sess, global_step))
 
-            if step % 1000 == 0:
+            if tf.train.global_step(sess, global_step) % 50000 == 0:
                 saver_all.save(
                     sess,
                     os.path.join('.', args.checkpoint_dir, 'model'),
-                    global_step=global_step.eval())
+                    global_step=tf.train.global_step(sess, global_step))
                 saver_just_weights_and_biases.save(
                     sess,
                     os.path.join('.', args.checkpoint_dir, 'weights-biases'),
-                    global_step=global_step.eval())
+                    global_step=tf.train.global_step(sess, global_step))
