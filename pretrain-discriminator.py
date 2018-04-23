@@ -46,7 +46,7 @@ batch_size = args.batch_size
 end_of_sentence_id = 1  # TODO this should probably come from the data.
 sentence_length = 30
 
-# Get embeddings. TODO i have no clue if this is a good way to do this...
+# Get embeddings.
 with open(args.embeddings_file, "rb") as f:
     embeddings = np.load(f)
 embedding_size = embeddings.shape[1]
