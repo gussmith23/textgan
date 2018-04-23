@@ -18,6 +18,7 @@ import sys
 import argparse
 from tempfile import gettempdir
 import argparse
+import pickle
 
 tf.logging.set_verbosity(tf.logging.DEBUG)
 
@@ -31,6 +32,7 @@ parser.add_argument(
     '--checkpoint-dir',
     type=str,
     default=os.path.join(current_path, 'embeddings-skip-gram/'))
+parser.add_argument('--restore', type=str)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -122,11 +124,19 @@ with graph.as_default():
     with tf.name_scope('optimizer'):
         # We use the SGD optimizer.
         optimizer = tf.train.GradientDescentOptimizer(
-            learning_rate=1.0).minimize(
+            learning_rate=.00005).minimize(
                 loss, global_step=global_step)
 
+    # TODO this may be a cause of our issues. I'm not sure how variables actually
+    # work deep down, but this expression might not do what I think it does.
+    # Ideally, I'd like to have a variable which I can restore and eval() which
+    # tracks the value of embeddings/norm. I'm realizing this doesn't make much
+    # sense though. I'm gravitating towards just pickling the normalized embeddings
+    # at each checkpoint.
+    # So we just make the normalization an operation, and then later we eval() it
+    # and pickle the numpy array result on each checkpoint.
     norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1, keep_dims=True))
-    normalized_embeddings = tf.Variable(
+    normalized_embeddings = tf.identity(
         embeddings / norm, name='normalized_embeddings')
 
     # Need to understand this better! TF is interesting. This initializes the
@@ -134,17 +144,14 @@ with graph.as_default():
     init = tf.global_variables_initializer()
 
     saver_all = tf.train.Saver()
-    saver_embeddings = tf.train.Saver([normalized_embeddings])
-
-    if args.checkpoint_dir is not None and tf.train.latest_checkpoint(
-            args.checkpoint_dir) is not None:
-        saver_all.restore(sess, tf.train.latest_checkpoint(
-            args.checkpoint_dir))
-
+    # saver_embeddings = tf.train.Saver([normalized_embeddings])
     merged_summary_op = tf.summary.merge_all()
 
 with tf.Session(graph=graph) as session:
     init.run()
+
+    if args.restore is not None:
+        saver_all.restore(session, args.restore)
 
     writer = tf.summary.FileWriter("embeddings-skip-gram-summary",
                                    session.graph)
@@ -164,7 +171,12 @@ with tf.Session(graph=graph) as session:
                     session,
                     os.path.join(args.checkpoint_dir, 'model'),
                     global_step=tf.train.global_step(session, global_step))
-                saver_embeddings.save(
-                    session,
-                    os.path.join(args.checkpoint_dir, 'embeddings'),
-                    global_step=tf.train.global_step(session, global_step))
+                # saver_embeddings.save(
+                # session,
+                # os.path.join(args.checkpoint_dir, 'embeddings'),
+                # global_step=tf.train.global_step(session, global_step))
+                # Save embeddings by pickling, not by checkpointing.
+                with open("embeddings-cbow-{}.p".format(
+                        tf.train.global_step(session, global_step)),
+                          "wb") as f:
+                    pickle.dump(final_embeddings, f)
