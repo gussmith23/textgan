@@ -123,9 +123,8 @@ with graph.as_default():
 
     with tf.name_scope('optimizer'):
         # We use the SGD optimizer.
-        optimizer = tf.train.GradientDescentOptimizer(
-            learning_rate=.00005).minimize(
-                loss, global_step=global_step)
+        optimizer = tf.train.AdamOptimizer().minimize(
+            loss, global_step=global_step)
 
     # TODO this may be a cause of our issues. I'm not sure how variables actually
     # work deep down, but this expression might not do what I think it does.
