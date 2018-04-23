@@ -162,6 +162,11 @@ with graph.as_default():
     saver_all = tf.train.Saver()
     saver_embeddings = tf.train.Saver([normalized_embeddings])
 
+    if args.checkpoint_dir is not None and tf.train.latest_checkpoint(
+            args.checkpoint_dir) is not None:
+        saver_all.restore(sess, tf.train.latest_checkpoint(
+            args.checkpoint_dir))
+
     merged_summary_op = tf.summary.merge_all()
 
 with tf.Session(graph=graph) as session:
@@ -169,21 +174,21 @@ with tf.Session(graph=graph) as session:
 
     writer = tf.summary.FileWriter("embeddings-cbow-summary", session.graph)
 
-    step = 0
     for epoch in range(args.max_epochs):
         tf.logging.info("Epoch: {}/{}".format(epoch + 1, args.max_epochs))
         for inputs, labels in generate_batch(batch_size):
             feed_dict = {train_inputs: inputs, train_labels: labels}
             summary_str, _ = session.run(
                 [merged_summary_op, optimizer], feed_dict=feed_dict)
-            writer.add_summary(summary_str, step)
-            step += 1
+            writer.add_summary(summary_str,
+                               tf.train.global_step(session, global_step))
 
-        saver_all.save(
-            session,
-            os.path.join(args.checkpoint_dir, 'model'),
-            global_step=tf.train.global_step())
-        saver_embeddings.save(
-            session,
-            os.path.join(args.checkpoint_dir, 'embeddings'),
-            global_step=tf.train.global_step())
+            if tf.train.global_step(session, global_step) % 50000 == 0:
+                saver_all.save(
+                    session,
+                    os.path.join(args.checkpoint_dir, 'model'),
+                    global_step=tf.train.global_step(session, global_step))
+                saver_embeddings.save(
+                    session,
+                    os.path.join(args.checkpoint_dir, 'embeddings'),
+                    global_step=tf.train.global_step(session, global_step))
