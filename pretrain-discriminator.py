@@ -34,8 +34,7 @@ parser.add_argument(
     required=False,
     help=
     'directory containing latest checkpoint. if this flag is set, the model will be restored from this location.',
-    default="pretrain-discriminator"
-)
+    default="pretrain-discriminator")
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -168,9 +167,9 @@ with tf.Session(config=config) as sess:
 
     # TODO use --restore flag
     # if args.checkpoint_dir is not None:
-        # tf.logging.info("Restoring from {}".format(args.checkpoint_dir))
-        # saver_all.restore(sess, tf.train.latest_checkpoint(
-            # args.checkpoint_dir))
+    # tf.logging.info("Restoring from {}".format(args.checkpoint_dir))
+    # saver_all.restore(sess, tf.train.latest_checkpoint(
+    # args.checkpoint_dir))
 
     # Credit to https://blog.altoros.com/visualizing-tensorflow-graphs-with-tensorboard.html
     # for help with summaries.
@@ -207,9 +206,10 @@ with tf.Session(config=config) as sess:
                     x_data_tweaked: tweaked_sentences
                 })
 
-            writer.add_summary(summary_str, tf.train.global_step(sess, global_step))
+            writer.add_summary(summary_str,
+                               tf.train.global_step(sess, global_step))
 
-            if tf.train.global_step(sess, global_step) % 50000 == 0:
+            if tf.train.global_step(sess, global_step) % 1000 == 0:
                 saver_all.save(
                     sess,
                     os.path.join('.', args.checkpoint_dir, 'model'),
@@ -218,3 +218,13 @@ with tf.Session(config=config) as sess:
                     sess,
                     os.path.join('.', args.checkpoint_dir, 'weights-biases'),
                     global_step=tf.train.global_step(sess, global_step))
+
+    # Save once all epochs are done.
+    saver_all.save(
+        sess,
+        os.path.join('.', args.checkpoint_dir, 'model'),
+        global_step=tf.train.global_step(sess, global_step))
+    saver_just_weights_and_biases.save(
+        sess,
+        os.path.join('.', args.checkpoint_dir, 'weights-biases'),
+        global_step=tf.train.global_step(sess, global_step))
