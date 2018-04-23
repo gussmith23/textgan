@@ -4,6 +4,7 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import data.datasets
 import tensorflow as tf
+import numpy as np
 
 parser = argparse.ArgumentParser(description='Visualize embeddings.')
 parser.add_argument(
@@ -11,11 +12,11 @@ parser.add_argument(
     type=str,
     required=True,
     help='filepath of the embeddings file to use')
-parser.add_argument(
-    '--embeddings-tensor-name',
-    type=str,
-    required=True,
-    help='name of the embeddings tensor')
+# parser.add_argument(
+# '--embeddings-tensor-name',
+# type=str,
+# required=True,
+# help='name of the embeddings tensor')
 parser.add_argument(
     '--dataset-name', type=str, required=True, help='name of dataset')
 parser.add_argument(
@@ -29,12 +30,16 @@ data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictio
     dataset_name)
 
 # Get embeddings. TODO i have no clue if this is a good way to do this...
-embeddings = tf.Variable(
-    -1.0, validate_shape=False, name=args.embeddings_tensor_name)
-with tf.Session() as sess:
-    tf.train.Saver().restore(sess, args.embeddings_file)
-    embeddings = sess.run(embeddings)
-    embedding_size = embeddings.shape[1]
+# embeddings = tf.Variable(
+# -1.0, validate_shape=False, name=args.embeddings_tensor_name)
+# with tf.Session() as sess:
+# tf.train.Saver().restore(sess, args.embeddings_file)
+# embeddings = sess.run(embeddings)
+# embedding_size = embeddings.shape[1]
+# Switched to using saved numpy arrays instead.
+with open(args.embeddings_file, "rb") as f:
+    embeddings = np.load(f)
+embedding_size = embeddings.shape[1]
 
 
 # Visualization
