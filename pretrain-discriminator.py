@@ -200,8 +200,8 @@ with tf.Session(config=config) as sess:
             # was with the fact that we were using tf calls in the generator,
             # which creates new nodes.
 
-            summary_str = sess.run(
-                merged_summary_op,
+            summary_str, _ = sess.run(
+                [merged_summary_op, d_trainer],
                 feed_dict={
                     x_data: pure_sentences,
                     x_data_tweaked: tweaked_sentences
