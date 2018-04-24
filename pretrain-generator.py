@@ -96,11 +96,8 @@ global_step = tf.Variable(0, name='global_step', trainable=False)
 var_list = tf.get_collection(
     tf.GraphKeys.GLOBAL_VARIABLES, scope="generator") + tf.get_collection(
         tf.GraphKeys.GLOBAL_VARIABLES,
-        scope="discriminator/conv") + tf.get_collection(
-            tf.GraphKeys.GLOBAL_VARIABLES,
-            scope="discriminator/encoder_fc_1") + tf.get_collection(
-                tf.GraphKeys.GLOBAL_VARIABLES,
-                scope="discriminator/encoder_fc_2")
+        scope="discriminator/encoder_fc_1") + tf.get_collection(
+            tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator/encoder_fc_2")
 
 loss = tf.reduce_sum(total_log_probability)
 optimizer = tf.train.AdamOptimizer(
