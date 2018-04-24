@@ -130,7 +130,7 @@ x_data = tf.placeholder(
 x_data_tweaked = tf.placeholder(
     dtype=tf.float32, shape=[batch_size, sentence_length, embedding_size])
 
-logits_data, logits_tweaked, embedding_data, embedding_tweaked, d_params = build_discriminator(
+logits_data, logits_tweaked, _, _, _, _, d_params = build_discriminator(
     x_data, x_data_tweaked, batch_size, sentence_length, embedding_size)
 
 global_step = tf.Variable(0, name='global_step', trainable=False)
