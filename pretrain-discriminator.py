@@ -38,10 +38,9 @@ parser.add_argument(
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
-data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = data.datasets.get(
+data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary, training_data, validation_data, testing_data = data.datasets.get_split(
     dataset_name)
 num_classes = len(dictionary)
-all_sentences = reduce(operator.add, data.values(), [])
 batch_size = args.batch_size
 end_of_sentence_id = 1  # TODO this should probably come from the data.
 sentence_length = 30
@@ -53,7 +52,7 @@ embedding_size = embeddings.shape[1]
 
 
 # TODO though we call it "batch_size", the real batch size is 2*batch_size.
-def batch_gen():
+def batch_gen(data, batch_size=batch_size):
     """
   Returns a pair of tensors:
   - [batch_size, sentence_length, embedding_size]: the "pure" sentences
@@ -63,11 +62,11 @@ def batch_gen():
     i = 0
     # While there are enough sentences left.
     # TODO could be cleaner?
-    while len(all_sentences) - i >= 2 * batch_size:
+    while len(data) - i >= 2 * batch_size:
 
         tweaked_sentences, pure_sentences = [], []
 
-        for sentence in all_sentences[i:i + 2 * batch_size]:
+        for sentence in data[i:i + 2 * batch_size]:
             if len(sentence) > 2 and len(tweaked_sentences) < batch_size:
                 tweaked_sentences.append(sentence[:sentence_length])
             elif len(pure_sentences) < batch_size:
@@ -141,13 +140,22 @@ d_loss = tf.reduce_mean(
         logits=tf.concat([logits_data, logits_tweaked], axis=0),
         labels=tf.constant(
             [[1, 0]] * batch_size + [[0, 1]] * batch_size, dtype=tf.float32)))
-tf.summary.scalar("d_loss", d_loss)
+d_loss_summary = tf.summary.scalar("d_loss", d_loss)
 
 optimizer = tf.train.AdamOptimizer(args.learning_rate)
 d_trainer = optimizer.minimize(
     d_loss, var_list=d_params, global_step=global_step)
 
-merged_summary_op = tf.summary.merge_all()
+predicted = tf.one_hot(
+    tf.argmax(tf.concat([logits_data, logits_tweaked], axis=0), axis=1),
+    depth=2,
+    dtype=tf.int64)
+labels = tf.constant(
+    [[1, 0]] * batch_size + [[0, 1]] * batch_size, dtype=tf.int64)
+predicted = tf.Print(predicted, [predicted, labels])
+accuracy = tf.reduce_mean(
+    tf.cast(tf.equal(predicted, labels), dtype=tf.float32))
+# tf.summary.scalar("accuracy", accuracy)
 
 init_g = tf.global_variables_initializer()
 init_l = tf.local_variables_initializer()
@@ -184,7 +192,7 @@ with tf.Session(config=config) as sess:
     for epoch in range(args.max_epoch):
         tf.logging.info("Epoch: {}/{}".format(epoch + 1, args.max_epoch))
         for batch_i, (pure_sentences, tweaked_sentences) in enumerate(
-                batch_gen()):
+                batch_gen(training_data)):
 
             # TODO this is kind of messy. basically, batch_gen() returns tensors, which
             # must be "fed" through these assign call here. batch_gen() has to return a
@@ -200,7 +208,7 @@ with tf.Session(config=config) as sess:
             # which creates new nodes.
 
             summary_str, _ = sess.run(
-                [merged_summary_op, d_trainer],
+                [d_loss_summary, d_trainer],
                 feed_dict={
                     x_data: pure_sentences,
                     x_data_tweaked: tweaked_sentences
@@ -218,6 +226,20 @@ with tf.Session(config=config) as sess:
                     sess,
                     os.path.join('.', args.checkpoint_dir, 'weights-biases'),
                     global_step=tf.train.global_step(sess, global_step))
+
+        # Evaluate validation data every epoch
+        num_batches = 0
+        accuracy_accum = 0
+        for pure_sentences, tweaked_sentences in batch_gen(validation_data):
+            num_batches += 1
+            accuracy_accum += sess.run(
+                accuracy,
+                feed_dict={
+                    x_data: pure_sentences,
+                    x_data_tweaked: tweaked_sentences
+                })
+        tf.logging.info("Mean accuracy for validation set: {}".format(
+            accuracy_accum / num_batches))
 
     # Save once all epochs are done.
     saver_all.save(
