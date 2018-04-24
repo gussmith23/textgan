@@ -14,6 +14,7 @@ def build_generator(z_prior,
                     embedding_size,
                     z_prior_size,
                     max_sentence_length,
+                    after_sentence_id,
                     real_sentences=None):
     """
     real_sentences: if not None, each sentence in real_sentences is the
@@ -51,7 +52,11 @@ def build_generator(z_prior,
         if real_sentences is not None:
             # See Gan 2016 section 2.1 (LSTM decoder) for an explanation
             total_log_probability = 0
-            increasing = tf.range(start=0, limit=batch_size, delta=1)
+            increasing = tf.range(
+                start=0,
+                limit=tf.cast(batch_size, tf.int64),
+                delta=1,
+                dtype=tf.int64)
 
         def loop_fn(time, cell_output, cell_state, loop_state):
             if cell_output is None:
@@ -78,7 +83,7 @@ def build_generator(z_prior,
                 #next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
 
                 # this is what should be emitted next
-                next_loop_state = (next_word_id, next_word)
+                # next_loop_state = (next_word_id, next_word)
 
                 # this tells raw_rnn what the rest of our emits will look like.
                 # first item: the id of the word that was generated
@@ -86,8 +91,10 @@ def build_generator(z_prior,
                 # via soft-argmax.
                 # basically a placeholder for what INDIVIDUAL batch items will be emitting on
                 # each iteration.
-                emit_output = (tf.zeros([], dtype=tf.int64),
-                               tf.zeros([embedding_size], dtype=tf.float32))
+                emit_output = (
+                    tf.zeros([], dtype=tf.int64),
+                    tf.zeros([embedding_size], dtype=tf.float32),
+                    tf.zeros([], dtype=tf.float32))  # negative log probability
 
             else:
                 # If this first emit_output return value is None, then the emit_ta
@@ -98,6 +105,7 @@ def build_generator(z_prior,
                 # so we needed to expand this so that its first dim is the batch size
                 #emit_output = tf.expand_dims(loop_state,0)
                 # this shouldn't be the case anymore...we should be able to directly do:
+                # Note: moved this below
                 emit_output = loop_state
                 next_cell_state = cell_state
                 mul = tf.matmul(cell_state.h, V) + Vb
@@ -106,7 +114,10 @@ def build_generator(z_prior,
                 next_word = tf.matmul(
                     tf.nn.softmax(L * mul, axis=1), embeddings)
                 #next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
-                next_loop_state = (next_word_id, next_word)
+                # next_loop_state = (next_word_id, next_word)
+
+            # TODO this should be improved
+            elements_finished = (time >= max_sentence_length)
 
             if real_sentences is not None:
                 # For each sentence, we get the negative log probability of
@@ -119,24 +130,57 @@ def build_generator(z_prior,
 
                 # Concatenate batch index and true label
                 # Note that in Tensorflow < 1.0.0 you must call tf.pack
-                mask = tf.stack([increasing, real_sentences[:, time]], axis=1)
+                # Note the cond: basically just avoiding an error when we
+                # finish the sentence. Note that this whole block gets run
+                # when elements_finished is true, but the output isn't used
+                # so there's probably a cleaner way to do this.
+                mask = tf.stack(
+                    [
+                        increasing,
+                        real_sentences[:,
+                                       tf.cond(time < max_sentence_length,
+                                               lambda: time, lambda: 0)]
+                    ],
+                    axis=1)
 
                 # Extract values
-                masked = tf.gather_nd(params=tf.softmax(mul), indices=mask)
+                sm = tf.nn.softmax(mul)
 
-                total_log_probability += -tf.log(masked)
+                masked = tf.gather_nd(params=sm, indices=mask)
 
-            # TODO this should be improved
-            elements_finished = (time >= max_sentence_length)
+                # only take the softmax values that correspond to valid words.
+                # otherwise, use 1, so that the sum of logs will not be affected.
+                masked = tf.where(
+                    tf.not_equal(mask[:, 1], after_sentence_id), masked,
+                    tf.ones([batch_size], dtype=tf.float32))
+
+                neg_log_probability = -tf.log(masked)
+
+                replace = tf.ones_like(neg_log_probability) * tf.constant(1e0)
+                neg_log_probability = tf.where(
+                    tf.is_inf(neg_log_probability), replace,
+                    neg_log_probability)
+
+                # neg_log_probability = tf.Print(neg_log_probability, [mul])
+
+            # Determine what should be emitted next time.
+            if real_sentences is not None:
+                next_loop_state = (next_word_id, next_word,
+                                   neg_log_probability)
+            else:
+                next_loop_state = (next_word_id, next_word,
+                                   tf.zeros([batch_size], dtype=tf.float32))
 
             return (elements_finished, next_word, next_cell_state, emit_output,
                     next_loop_state)
 
         emit_ta, final_state, final_loop_state = tf.nn.raw_rnn(cell, loop_fn)
 
-        word_ids, words = emit_ta
+        word_ids, words, neg_log_probability_ta = emit_ta
+
+        out_log_prob = _transpose_batch_time(neg_log_probability_ta.stack())
 
         # must transpose first two dimensions from [sentence_length, batch_size]
         # to [batch_size, sentence_length]
         return _transpose_batch_time(word_ids.stack()), _transpose_batch_time(
-            words.stack()), [V, Vb, C, Cb], total_log_probability
+            words.stack()), [V, Vb, C, Cb], out_log_prob
