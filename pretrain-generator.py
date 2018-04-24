@@ -31,6 +31,7 @@ parser.add_argument(
     required=False,
     help='directory in which to store checkpoints.',
     default="pretrain-generator")
+parser.add_argument('--restore', type=str)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -87,10 +88,19 @@ x_generated_ids, x_generated, g_params, total_log_probability = build_generator(
     embedding_size,
     z_prior_size,
     sentence_length,
-    after_sentence_id,
+    after_sentence_id=after_sentence_id,
     real_sentences=sentences_as_ids)
 
 global_step = tf.Variable(0, name='global_step', trainable=False)
+
+var_list = tf.get_collection(
+    tf.GraphKeys.GLOBAL_VARIABLES, scope="generator") + tf.get_collection(
+        tf.GraphKeys.GLOBAL_VARIABLES,
+        scope="discriminator/conv") + tf.get_collection(
+            tf.GraphKeys.GLOBAL_VARIABLES,
+            scope="discriminator/encoder_fc_1") + tf.get_collection(
+                tf.GraphKeys.GLOBAL_VARIABLES,
+                scope="discriminator/encoder_fc_2")
 
 loss = tf.reduce_sum(total_log_probability)
 optimizer = tf.train.AdamOptimizer(
@@ -101,15 +111,7 @@ optimizer = tf.train.AdamOptimizer(
 # a long and painful debugging session!
 # See:
 # https://stackoverflow.com/questions/36498127
-gvs = optimizer.compute_gradients(
-    loss,
-    var_list=tf.get_collection(
-        tf.GraphKeys.GLOBAL_VARIABLES, scope="generator") + tf.get_collection(
-            tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator/conv") +
-    tf.get_collection(
-        tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator/encoder_fc_1") +
-    tf.get_collection(
-        tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator/encoder_fc_2"))
+gvs = optimizer.compute_gradients(loss, var_list=var_list)
 capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
 train_op = optimizer.apply_gradients(capped_gvs, global_step=global_step)
 tf.summary.scalar("loss", loss)
@@ -122,28 +124,22 @@ init_l = tf.local_variables_initializer()
 # The first saver is for saving/restoring for pretraining.
 # The second saver is for restoring the weights for use in other networks.
 saver_all = tf.train.Saver()
-saver_just_weights_and_biases = tf.train.Saver(
-    var_list=tf.get_collection(
-        tf.GraphKeys.GLOBAL_VARIABLES, scope="generator"))
+saver_just_weights_and_biases = tf.train.Saver(var_list=var_list)
 
 # TODO this is needed on Windows
 # https://stackoverflow.com/questions/41117740/tensorflow-crashes-with-cublas-status-alloc-failed?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 with tf.Session(config=config) as sess:
+    sess.run(init_g)
+    sess.run(init_l)
 
-    # TODO use --restore flag
-    # if args.checkpoint_dir is not None:
-    # tf.logging.info("Restoring from {}".format(args.checkpoint_dir))
-    # saver_all.restore(sess, tf.train.latest_checkpoint(
-    # args.checkpoint_dir))
+    if args.restore is not None:
+        saver_all.restore(sess, args.restore)
 
     # Credit to https://blog.altoros.com/visualizing-tensorflow-graphs-with-tensorboard.html
     # for help with summaries.
     writer = tf.summary.FileWriter("pretrain-generator-summary", sess.graph)
-
-    sess.run(init_g)
-    sess.run(init_l)
 
     tf.logging.info("Beginnning training.")
 

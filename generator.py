@@ -14,8 +14,8 @@ def build_generator(z_prior,
                     embedding_size,
                     z_prior_size,
                     max_sentence_length,
-                    after_sentence_id,
-                    real_sentences=None):
+                    real_sentences=None,
+                    after_sentence_id=None):
     """
     real_sentences: if not None, each sentence in real_sentences is the
                     sentence which generated the corresponding entry in
@@ -23,6 +23,7 @@ def build_generator(z_prior,
                     real_sentences is used for pretraining.
                     shape: [batch_size, sentence_length]
                     each entry is a word id, not a word embedding.
+    after_sentence_id: must not be None if real_sentences is not None.
     """
     with tf.variable_scope('generator') as function_scope:
 
