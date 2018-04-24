@@ -16,10 +16,11 @@ from functools import reduce
 from discriminator import build_discriminator
 from generator import build_generator
 import random
+import os
 
 tf.logging.set_verbosity(tf.logging.DEBUG)
 
-parser = argparse.ArgumentParser(description='TextGAN implementation.')
+parser = argparse.ArgumentParser(description='GAN implementation.')
 # parser.add_argument('integers', metavar='N', type=int, nargs='+',
 #                     help='an integer for the accumulator')
 parser.add_argument(
@@ -183,53 +184,56 @@ with tf.Session(config=config) as sess:
     num_batches = len(all_sentences) // batch_size
 
     tf.logging.info("Beginnning training.")
-    for batch_i, batch in enumerate(batch_gen()):
-        tf.logging.info("Batch: {}/{}".format(batch_i, num_batches))
+    for epoch in range(max_epochs):
+        for batch_i, batch in enumerate(batch_gen()):
+            tf.logging.info("Batch: {}/{}".format(batch_i, num_batches))
 
-        z_value = np.random.normal(
-            0, 1, size=(batch_size, z_prior_size)).astype(np.float32)
+            z_value = np.random.normal(
+                0.1, 1, size=(batch_size, z_prior_size)).astype(np.float32)
 
-        # TODO this is kind of messy. basically, batch_gen() returns a tensor, which
-        # must be "fed" through this assign call here. batch_gen() has to return a
-        # tensor because i'm not sure how else to feed sentences in.
-        # if we feed just IDs, then each sentence has to be padded already when it
-        # gets fed in, in which case we need some reserved ID which should be
-        # converted to padding instead of being looked up in the embeddings.
-        # TODO https://github.com/tensorflow/tensorflow/issues/2382#issuecomment-224335676
-        # might be a solution.
+            # TODO this is kind of messy. basically, batch_gen() returns a tensor, which
+            # must be "fed" through this assign call here. batch_gen() has to return a
+            # tensor because i'm not sure how else to feed sentences in.
+            # if we feed just IDs, then each sentence has to be padded already when it
+            # gets fed in, in which case we need some reserved ID which should be
+            # converted to padding instead of being looked up in the embeddings.
+            # TODO https://github.com/tensorflow/tensorflow/issues/2382#issuecomment-224335676
+            # might be a solution.
 
-        summary_str, _ = sess.run(
-            [merged_summary_op, d_trainer],
-            feed_dict={
-                z_prior: z_value,
-                x_data: batch
-            })
+            summary_str, _ = sess.run(
+                [merged_summary_op, d_trainer],
+                feed_dict={
+                    z_prior: z_value,
+                    x_data: batch
+                })
 
-        writer.add_summary(
-            summary_str, global_step=tf.train.global_step(sess, global_step))
-
-        out_sentence, summary_str, _ = sess.run(
-            [x_generated_ids, merged_summary_op, g_trainer],
-            feed_dict={
-                z_prior: z_value,
-                x_data: batch
-            })
-
-        writer.add_summary(
-            summary_str, global_step=tf.train.global_step(sess, global_step))
-
-        tf.logging.debug("Generated sentences: {}".format(
-            "\n".join([
-                " ".join(
-                    [reversed_dictionary[word_id] for word_id in sentence])
-                for sentence in out_sentence
-            ])))
-
-        if tf.train.global_step(sess, global_step) % 10000 == 0:
-            saver.save(
-                sess,
-                os.path.join('.', args.checkpoint_dir, 'model'),
+            writer.add_summary(
+                summary_str,
                 global_step=tf.train.global_step(sess, global_step))
+
+            out_sentence, summary_str, _ = sess.run(
+                [x_generated_ids, merged_summary_op, g_trainer],
+                feed_dict={
+                    z_prior: z_value,
+                    x_data: batch
+                })
+
+            writer.add_summary(
+                summary_str,
+                global_step=tf.train.global_step(sess, global_step))
+
+            tf.logging.debug("Generated sentences: {}".format(
+                "\n".join([
+                    " ".join(
+                        [reversed_dictionary[word_id] for word_id in sentence])
+                    for sentence in out_sentence
+                ])))
+
+            if tf.train.global_step(sess, global_step) % 10000 == 0:
+                saver.save(
+                    sess,
+                    os.path.join('.', args.checkpoint_dir, 'model'),
+                    global_step=tf.train.global_step(sess, global_step))
 
     # Save once all epochs are done.
     saver.save(
