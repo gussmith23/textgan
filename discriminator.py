@@ -91,8 +91,8 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
         # constraints.
 
         # Move everything into depth so we can perform a single matrix multiply.
-        reshape = tf.reshape(pool1, [x_in.get_shape().as_list()[0], -1])
-        reshape = tf.sigmoid(reshape)
+        reshape_pre = tf.reshape(pool1, [x_in.get_shape().as_list()[0], -1])
+        reshape = tf.sigmoid(reshape_pre)
         # TODO can this be computed statically? i think it can, i'm just too lazy to do it right now.
         dim = tf.shape(reshape)[1]
 
@@ -154,6 +154,11 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
         encoding_generated = tf.tanh(
             tf.slice(e_fc_2, [batch_size, 0], [-1, -1], name=None))
 
+        features_data = tf.slice(
+            reshape_pre, [0, 0], [batch_size, -1], name=None)
+        features_generated = tf.slice(
+            reshape_pre, [batch_size, 0], [-1, -1], name=None)
+
         # y_data = tf.slice(
         # tf.nn.softmax(tf.slice(fc, [0, 0], [batch_size, -1], name=None)),
         # [0, 0], [-1, 1])
@@ -161,7 +166,7 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
         # tf.nn.softmax(tf.slice(fc, [batch_size, 0], [-1, -1], name=None)),
         # [0, 0], [-1, 1])
 
-        return logits_data, logits_generated, encoding_data, encoding_generated, [
+        return logits_data, logits_generated, encoding_data, encoding_generated, features_data, features_generated, [
             conv1_filter_3, conv1_filter_4, conv1_filter_5, conv1_bias,
             d_fc_1_weights, d_fc_1_bias, d_fc_2_weights, d_fc_2_bias,
             e_fc_1_weights, e_fc_1_bias, e_fc_2_weights, e_fc_2_bias
