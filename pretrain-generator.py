@@ -8,6 +8,7 @@ import data.datasets
 import numpy as np
 from discriminator import build_discriminator
 from generator import build_generator
+import os
 
 tf.logging.set_verbosity(tf.logging.DEBUG)
 
