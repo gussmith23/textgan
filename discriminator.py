@@ -3,13 +3,12 @@ import tensorflow as tf
 
 # TODO it would be nice to not have to pass the sizes in automatically, but
 # I can't figure it out.
-def build_discriminator(x_data, x_generated, sentence_length, embedding_size):
+def build_discriminator(x_data, x_generated, batch_size, sentence_length,
+                        embedding_size):
     """
   assuming that these come in as shape [batch_size, sentence_length, embedding_size]
   all sentences must be padded to the same length.
   """
-
-    batch_size = tf.shape(x_data)[0]
 
     with tf.variable_scope('discriminator') as function_scope:
 
@@ -18,6 +17,9 @@ def build_discriminator(x_data, x_generated, sentence_length, embedding_size):
         # them into one.
         x_in = tf.concat([x_data, x_generated], 0)
         x_in = tf.expand_dims(x_in, 3)  # add channel dimension
+        assert (x_in.get_shape().as_list() == [
+            2 * batch_size, sentence_length, embedding_size, 1
+        ])
 
         # building the CNN with help from
         # - Kim 2014 (which describes the CNN)
