@@ -13,6 +13,8 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
     with tf.variable_scope('discriminator') as function_scope:
 
         # concatenate batches
+        # this is a little ridiculous -- why do we take two args just to concat
+        # them into one.
         x_in = tf.concat([x_data, x_generated], 0)
         x_in = tf.expand_dims(x_in, 3)  # add channel dimension
         assert (x_in.get_shape().as_list() == [
@@ -134,7 +136,8 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
                 validate_shape=False,
                 name="weights")
             e_fc_2_bias = tf.Variable(
-                tf.random_normal([2]), name="bias")  # TODO initialize to zero?
+                tf.random_normal([900]),
+                name="bias")  # TODO initialize to zero?
             e_fc_2 = tf.matmul(e_fc_1, e_fc_2_weights) + e_fc_2_bias
             e_fc_2 = tf.identity(e_fc_2, name=scope.name)
 
