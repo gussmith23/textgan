@@ -157,12 +157,12 @@ def build_generator(z_prior,
 
                 neg_log_probability = -tf.log(masked)
 
-                replace = tf.ones_like(neg_log_probability) * tf.constant(1e0)
+                # TODO not sure what to do here. Zeros after the softmax lead
+                # to infinities after the log.
+                replace = tf.ones_like(neg_log_probability) * tf.constant(1e2)
                 neg_log_probability = tf.where(
                     tf.is_inf(neg_log_probability), replace,
                     neg_log_probability)
-
-                # neg_log_probability = tf.Print(neg_log_probability, [mul])
 
             # Determine what should be emitted next time.
             if real_sentences is not None:
