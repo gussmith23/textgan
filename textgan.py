@@ -48,6 +48,11 @@ parser.add_argument(
 parser.add_argument('--learning-rate', type=float, default=0.00005)
 parser.add_argument('--gradient-clip', type=float, default=5)
 parser.add_argument('--mmd-sigma', type=float, default=1e1)
+parser.add_argument(
+    '--g-it-per-d-it',
+    help="Number of training iterations for g, for every d training iteration",
+    type=int,
+    default=5)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -239,29 +244,44 @@ with tf.Session(config=config) as sess:
                 summary_str,
                 global_step=tf.train.global_step(sess, global_step))
 
-            out_sentence, summary_str, _ = sess.run(
-                [x_generated_ids, merged_summary_op, g_train_op],
-                feed_dict={
-                    z_prior: z_value,
-                    x_data: batch
-                })
-
-            writer.add_summary(
-                summary_str,
-                global_step=tf.train.global_step(sess, global_step))
-
-            tf.logging.debug("Generated sentences: {}".format(
-                "\n".join([
-                    " ".join(
-                        [reversed_dictionary[word_id] for word_id in sentence])
-                    for sentence in out_sentence
-                ])))
-
+            # TODO we currently replicate this; should find a cleaner way.
             if tf.train.global_step(sess, global_step) % 10000 == 0:
                 saver.save(
                     sess,
                     os.path.join('.', args.checkpoint_dir, 'model'),
                     global_step=tf.train.global_step(sess, global_step))
+
+            # For every 1 training iteration of d, we train g multiple times.
+            for _ in range(args.g_it_per_d_it):
+                z_value = np.random.normal(
+                    0.1, 1, size=(batch_size, z_prior_size)).astype(
+                        np.float32)
+
+                out_sentence, summary_str, _ = sess.run(
+                    [x_generated_ids, merged_summary_op, g_train_op],
+                    feed_dict={
+                        z_prior: z_value,
+                        x_data: batch
+                    })
+
+                writer.add_summary(
+                    summary_str,
+                    global_step=tf.train.global_step(sess, global_step))
+
+                tf.logging.debug("Generated sentences: {}".format(
+                    "\n".join([
+                        " ".join([
+                            reversed_dictionary[word_id]
+                            for word_id in sentence
+                        ]) for sentence in out_sentence
+                    ])))
+
+                # TODO we currently replicate this; should find a cleaner way.
+                if tf.train.global_step(sess, global_step) % 10000 == 0:
+                    saver.save(
+                        sess,
+                        os.path.join('.', args.checkpoint_dir, 'model'),
+                        global_step=tf.train.global_step(sess, global_step))
 
     # Save once all epochs are done.
     saver.save(
