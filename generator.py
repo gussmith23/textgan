@@ -72,6 +72,10 @@ def build_generator(z_prior,
                 # [batch_size, num_classes]
                 mul = tf.matmul(h1, V) + Vb
                 next_word_id = tf.argmax(mul, axis=1)
+                # TODO C is NaN when running textgan!
+                # but after a single batch?
+                # maybe gradient needs to be clipped!
+                # next_word_id = tf.Print(next_word_id, [C], summarize= 100)
 
                 # section 2.5 of Zhang discusses this "soft-argmax". in simpler terms,
                 # this is needed because argmax has no gradient and thus breaks the path
