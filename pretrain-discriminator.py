@@ -35,6 +35,7 @@ parser.add_argument(
     help=
     'directory containing latest checkpoint. if this flag is set, the model will be restored from this location.',
     default="pretrain-discriminator")
+parser.add_argument('--restore', type=str)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -152,7 +153,6 @@ predicted = tf.one_hot(
     dtype=tf.int64)
 labels = tf.constant(
     [[1, 0]] * batch_size + [[0, 1]] * batch_size, dtype=tf.int64)
-predicted = tf.Print(predicted, [predicted, labels])
 accuracy = tf.reduce_mean(
     tf.cast(tf.equal(predicted, labels), dtype=tf.float32))
 # tf.summary.scalar("accuracy", accuracy)
@@ -172,20 +172,16 @@ saver_just_weights_and_biases = tf.train.Saver(
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 with tf.Session(config=config) as sess:
+    sess.run(init_g)
+    sess.run(init_l)
 
-    # TODO use --restore flag
-    # if args.checkpoint_dir is not None:
-    # tf.logging.info("Restoring from {}".format(args.checkpoint_dir))
-    # saver_all.restore(sess, tf.train.latest_checkpoint(
-    # args.checkpoint_dir))
+    if args.restore is not None:
+        saver_all.restore(sess, args.restore)
 
     # Credit to https://blog.altoros.com/visualizing-tensorflow-graphs-with-tensorboard.html
     # for help with summaries.
     writer = tf.summary.FileWriter("pretrain-discriminator-summary",
                                    sess.graph)
-
-    sess.run(init_g)
-    sess.run(init_l)
 
     tf.logging.info("Beginnning training.")
 
