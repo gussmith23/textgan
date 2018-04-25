@@ -71,12 +71,10 @@ sentences_as_embeddings = tf.map_fn(
 
 # TODO this is dumb...have to rewrite the discriminator so that we don't have to
 # input two sets of data.
-x_data = tf.placeholder(
-    dtype=tf.float32, shape=[batch_size, sentence_length, embedding_size])
 empty = tf.zeros(
     [batch_size, sentence_length, embedding_size], dtype=tf.float32)
 
-_, _, encoding, _, d_params = build_discriminator(
+_, _, encoding, _, _, _, d_params = build_discriminator(
     sentences_as_embeddings, empty, batch_size, sentence_length,
     embedding_size)
 
