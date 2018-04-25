@@ -47,6 +47,7 @@ parser.add_argument(
     '--checkpoint-dir', type=str, required=False, default="textgan")
 parser.add_argument('--learning-rate', type=float, default=0.00005)
 parser.add_argument('--gradient-clip', type=float, default=5)
+parser.add_argument('--mmd-sigma', type=float, default=1e1)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -121,7 +122,7 @@ y_data, y_generated = tf.nn.softmax(logits_data), tf.nn.softmax(
 
 # Loss, as described in Zhang 2017
 lambda_r, lambda_m = 1.0, 1.0
-mmd_val = mmd.rbf_mmd2(features_data, features_generated)
+mmd_val = mmd.rbf_mmd2(features_data, features_generated, sigma=args.mmd_sigma)
 gan_val = tf.reduce_mean(tf.log(y_data)) + tf.reduce_mean(
     tf.log(1 - y_generated))
 recon_val = tf.reduce_sum(tf.norm(encoding_data - encoding_generated, axis=1))
