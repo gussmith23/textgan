@@ -179,17 +179,17 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 with tf.Session(config=config) as sess:
 
-    if args.d_pretrain_filepath is not None:
-        init_d_fn(sess)
-    if args.g_pretrain_filepath is not None:
-        init_g_fn(sess)
-
     # Credit to https://blog.altoros.com/visualizing-tensorflow-graphs-with-tensorboard.html
     # for help with summaries.
     writer = tf.summary.FileWriter("textgan-summary", sess.graph)
 
     init = tf.global_variables_initializer()
     sess.run(init)
+
+    if args.d_pretrain_filepath is not None:
+        init_d_fn(sess)
+    if args.g_pretrain_filepath is not None:
+        init_g_fn(sess)
 
     num_batches = len(all_sentences) // batch_size
 
