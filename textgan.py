@@ -42,7 +42,7 @@ parser.add_argument(
     type=str,
     help=
     'checkpoint filepath containing pretrained generator weights and biases')
-parser.add_argument('--max-epoch', type=int, default=100)
+parser.add_argument('--max-epoch', type=int, default=100000)
 parser.add_argument(
     '--checkpoint-dir', type=str, required=False, default="textgan")
 parser.add_argument('--learning-rate', type=float, default=0.00005)
