@@ -119,23 +119,37 @@ logits_data, logits_generated, encoding_data, encoding_generated, features_data,
 y_data, y_generated = tf.nn.softmax(logits_data), tf.nn.softmax(
     logits_generated)
 
+# Loss, as described in Zhang 2017
 lambda_r, lambda_m = 1.0, 1.0
-mmd_loss = mmd.rbf_mmd2(features_data, features_generated)
-gan_loss = tf.reduce_mean(tf.log(y_data)) + tf.reduce_mean(
+mmd_val = mmd.rbf_mmd2(features_data, features_generated)
+gan_val = tf.reduce_mean(tf.log(y_data)) + tf.reduce_mean(
     tf.log(1 - y_generated))
-recon_loss = tf.reduce_sum(tf.norm(encoding_data - encoding_generated, axis=1))
+recon_val = tf.reduce_sum(tf.norm(encoding_data - encoding_generated, axis=1))
+d_loss = -gan_val + lambda_r * recon_val - lambda_m * mmd_val
+g_loss = mmd_val
 
-d_loss = gan_loss - lambda_r * recon_loss + lambda_m * mmd_loss
-g_loss = mmd_loss
+tf.summary.scalar("mmd", mmd_val)
+tf.summary.scalar("gan", gan_val)
+tf.summary.scalar("recon", recon_val)
 tf.summary.scalar("d_loss", d_loss)
 tf.summary.scalar("g_loss", g_loss)
 
-optimizer = tf.train.AdamOptimizer(0.00005)
-d_trainer = optimizer.minimize(
-    d_loss, var_list=d_params, global_step=global_step)
-# TODO having problems with this -- no path to g_params
-g_trainer = optimizer.minimize(
-    g_loss, var_list=g_params, global_step=global_step)
+# Clipping gradients.
+# Not only is this described in Zhang, but it's necessary due to the presence
+# of infinite values.
+optimizer = tf.train.AdamOptimizer(args.learning_rate)
+d_gvs = optimizer.compute_gradients(
+    d_loss, var_list=tf.trainable_variables("discriminator"))
+d_capped_gvs = [(tf.clip_by_value(grad, -args.gradient_clip,
+                                  args.gradient_clip), var)
+                for grad, var in d_gvs]
+d_train_op = optimizer.apply_gradients(d_capped_gvs, global_step=global_step)
+g_gvs = optimizer.compute_gradients(
+    g_loss, var_list=tf.trainable_variables("generator"))
+g_capped_gvs = [(tf.clip_by_value(grad, -args.gradient_clip,
+                                  args.gradient_clip), var)
+                for grad, var in g_gvs]
+g_train_op = optimizer.apply_gradients(g_capped_gvs, global_step=global_step)
 
 merged_summary_op = tf.summary.merge_all()
 
@@ -210,7 +224,7 @@ with tf.Session(config=config) as sess:
             # might be a solution.
 
             summary_str, _ = sess.run(
-                [merged_summary_op, d_trainer],
+                [merged_summary_op, d_train_op],
                 feed_dict={
                     z_prior: z_value,
                     x_data: batch
@@ -221,7 +235,7 @@ with tf.Session(config=config) as sess:
                 global_step=tf.train.global_step(sess, global_step))
 
             out_sentence, summary_str, _ = sess.run(
-                [x_generated_ids, merged_summary_op, g_trainer],
+                [x_generated_ids, merged_summary_op, g_train_op],
                 feed_dict={
                     z_prior: z_value,
                     x_data: batch
