@@ -120,6 +120,10 @@ logits_data, logits_generated, encoding_data, encoding_generated, features_data,
 y_data, y_generated = tf.nn.softmax(logits_data), tf.nn.softmax(
     logits_generated)
 
+# TODO classifications come out as pairs of numbers; could instead come out as
+# single numbers representing the probability that the sentence is real.
+y_data, y_generated = y_data[:, 0], y_generated[:, 0]
+
 # Loss, as described in Zhang 2017
 lambda_r, lambda_m = 1.0, 1.0
 mmd_val = mmd.rbf_mmd2(features_data, features_generated, sigma=args.mmd_sigma)
