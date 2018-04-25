@@ -25,7 +25,7 @@ parser.add_argument(
     '--dataset-name', type=str, required=True, help='name of dataset')
 parser.add_argument('--max-epoch', type=int, default=100)
 # This is specified in Zhang 2017.
-parser.add_argument('--batch-size', type=int, default=256)
+parser.add_argument('--batch-size', type=int, default=16)
 # This is specified in Zhang 2017.
 parser.add_argument('--learning-rate', type=float, default=0.00005)
 parser.add_argument(
@@ -136,7 +136,7 @@ logits_data, logits_tweaked, _, _, _, _, d_params = build_discriminator(
 global_step = tf.Variable(0, name='global_step', trainable=False)
 
 #d_loss = tf.reduce_mean(-(tf.log(y_data) + tf.log(1 - y_data_tweaked)))
-d_loss = tf.reduce_mean(
+d_loss = tf.reduce_sum(
     tf.nn.sigmoid_cross_entropy_with_logits(
         logits=tf.concat([logits_data, logits_tweaked], axis=0),
         labels=tf.constant(
@@ -146,15 +146,13 @@ d_loss_summary = tf.summary.scalar("d_loss", d_loss)
 optimizer = tf.train.AdamOptimizer(args.learning_rate)
 d_trainer = optimizer.minimize(
     d_loss, var_list=d_params, global_step=global_step)
-
-predicted = tf.one_hot(
-    tf.argmax(tf.concat([logits_data, logits_tweaked], axis=0), axis=1),
-    depth=2,
-    dtype=tf.int64)
+predicted = tf.argmax(tf.concat([logits_data, logits_tweaked], axis=0), axis=1)
 labels = tf.constant(
-    [[1, 0]] * batch_size + [[0, 1]] * batch_size, dtype=tf.int64)
+    [0] * batch_size + [1] * batch_size, dtype=tf.int64)
 accuracy = tf.reduce_mean(
     tf.cast(tf.equal(predicted, labels), dtype=tf.float32))
+# accuracy = tf.Print(accuracy, [accuracy, predicted, labels], summarize = 2*batch_size)
+
 # tf.summary.scalar("accuracy", accuracy)
 
 init_g = tf.global_variables_initializer()
