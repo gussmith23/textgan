@@ -137,10 +137,9 @@ global_step = tf.Variable(0, name='global_step', trainable=False)
 
 #d_loss = tf.reduce_mean(-(tf.log(y_data) + tf.log(1 - y_data_tweaked)))
 d_loss = tf.reduce_sum(
-    tf.nn.sigmoid_cross_entropy_with_logits(
+    tf.nn.sparse_softmax_cross_entropy_with_logits(
         logits=tf.concat([logits_data, logits_tweaked], axis=0),
-        labels=tf.constant(
-            [[1, 0]] * batch_size + [[0, 1]] * batch_size, dtype=tf.float32)))
+        labels=tf.constant([0] * batch_size + [1] * batch_size)))
 d_loss_summary = tf.summary.scalar("d_loss", d_loss)
 
 optimizer = tf.train.AdamOptimizer(args.learning_rate)
