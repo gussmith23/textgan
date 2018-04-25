@@ -162,6 +162,7 @@ init_l = tf.local_variables_initializer()
 
 # The first saver is for saving/restoring for pretraining.
 # The second saver is for restoring the weights for use in other networks.
+# TODO should probably save specific variables.
 saver_all = tf.train.Saver()
 saver_just_weights_and_biases = tf.train.Saver(
     var_list=tf.get_collection(
