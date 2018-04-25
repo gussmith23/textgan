@@ -146,8 +146,7 @@ optimizer = tf.train.AdamOptimizer(args.learning_rate)
 d_trainer = optimizer.minimize(
     d_loss, var_list=d_params, global_step=global_step)
 predicted = tf.argmax(tf.concat([logits_data, logits_tweaked], axis=0), axis=1)
-labels = tf.constant(
-    [0] * batch_size + [1] * batch_size, dtype=tf.int64)
+labels = tf.constant([0] * batch_size + [1] * batch_size, dtype=tf.int64)
 accuracy = tf.reduce_mean(
     tf.cast(tf.equal(predicted, labels), dtype=tf.float32))
 # accuracy = tf.Print(accuracy, [accuracy, predicted, labels], summarize = 2*batch_size)
