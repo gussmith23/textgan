@@ -119,9 +119,6 @@ logits_data, logits_generated, encoding_data, encoding_generated, features_data,
 y_data, y_generated = tf.nn.softmax(logits_data), tf.nn.softmax(
     logits_generated)
 
-# d_loss = tf.reduce_mean(-(tf.log(y_data) + tf.log(1 - y_generated)))
-# g_loss = tf.reduce_mean(-tf.log(y_generated))
-
 lambda_r, lambda_m = 1.0, 1.0
 mmd_loss = mmd.rbf_mmd2(features_data, features_generated)
 gan_loss = tf.reduce_mean(tf.log(y_data)) + tf.reduce_mean(
