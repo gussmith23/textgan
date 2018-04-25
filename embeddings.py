@@ -157,6 +157,8 @@ with tf.Session(graph=graph) as session:
 
     for epoch in range(args.max_epochs):
         tf.logging.info("Epoch: {}/{}".format(epoch + 1, args.max_epochs))
+        tf.logging.info("Global step: {}".format(
+            tf.train.global_step(session, global_step)))
 
         for inputs, labels in generate_batch():
             feed_dict = {train_inputs: inputs, train_labels: labels}
