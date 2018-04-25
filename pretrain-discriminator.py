@@ -212,7 +212,7 @@ with tf.Session(config=config) as sess:
             writer.add_summary(summary_str,
                                tf.train.global_step(sess, global_step))
 
-            if tf.train.global_step(sess, global_step) % 1000 == 0:
+            if tf.train.global_step(sess, global_step) % 50000 == 0:
                 saver_all.save(
                     sess,
                     os.path.join('.', args.checkpoint_dir, 'model'),
