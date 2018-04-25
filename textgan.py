@@ -45,6 +45,8 @@ parser.add_argument(
 parser.add_argument('--max-epoch', type=int, default=100)
 parser.add_argument(
     '--checkpoint-dir', type=str, required=False, default="textgan")
+parser.add_argument('--learning-rate', type=float, default=0.00005)
+parser.add_argument('--gradient-clip', type=float, default=5)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
