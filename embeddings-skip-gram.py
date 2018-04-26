@@ -15,10 +15,10 @@ import math
 import numpy as np
 import os
 import sys
-import argparse
 from tempfile import gettempdir
 import argparse
 import pickle
+import random
 
 tf.logging.set_verbosity(tf.logging.DEBUG)
 
@@ -59,11 +59,13 @@ if not os.path.exists(args.checkpoint_dir):
 
 
 # TODO should we be ignoring UNK?
-def generate_batch(batch_size=16):
+def generate_batch(batch_size=batch_size):
+    _all_sentences = all_sentences[:]
+    random.shuffle(_all_sentences)
     inputs = np.ndarray(shape=(batch_size), dtype=np.int32)
     labels = np.ndarray(shape=(batch_size, 1), dtype=np.int32)
     ct = 0
-    for s in all_sentences:
+    for s in _all_sentences:
         s_len = len(s)
         for i, w in enumerate(s):
             # TODO kind of an ugly way to do this...
