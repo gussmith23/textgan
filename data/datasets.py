@@ -8,7 +8,11 @@ def get(name):
     """
     if name == 'babblebuds':
         from data.babblebuds.babblebuds import get_data
-        return get_data()
+        data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = get_data(
+        )
+        all_sentences = reduce(operator.add, data.values(), [])
+        return all_sentences, dictionary, reversed_dictionary
+
     elif name == 'arxiv':
         from data.arxiv.arxiv import get_data
         return get_data()
