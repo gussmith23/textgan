@@ -26,13 +26,20 @@ parser = argparse.ArgumentParser(
     description='Generate word embeddings via Skip-Gram model.')
 parser.add_argument(
     '--dataset-name', type=str, required=True, help='name of dataset')
-parser.add_argument('--max-epochs', type=int, default=1000)
+parser.add_argument('--max-epochs', type=int, default=10000)
 current_path = os.path.dirname(os.path.realpath(sys.argv[0]))
-parser.add_argument(
-    '--checkpoint-dir',
-    type=str,
-    default=os.path.join(current_path, 'embeddings-skip-gram/'))
+parser.add_argument('--checkpoint-dir', type=str, required=True)
+parser.add_argument('--summary-dir', type=str, required=True)
 parser.add_argument('--restore', type=str)
+parser.add_argument('--embedding-size', type=int, default=128)
+parser.add_argument('--num-negative-samples', type=int, default=64)
+parser.add_argument('--batch-size', type=int, default=16)
+parser.add_argument('--learning-rate', type=float, default=0.0005)
+parser.add_argument(
+    '--checkpoint-interval',
+    type=int,
+    default=50000,
+    help='number of epochs to run before checkpointing')
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -43,10 +50,9 @@ all_sentences = reduce(operator.add, data.values(), [])
 
 vocabulary_size = len(dictionary.keys())
 
-# Defaults chosen from the github link above.
-embedding_size = 128
-num_sampled = 64  # Number of negative examples to sample.
-batch_size = 16
+embedding_size = args.embedding_size
+num_sampled = args.num_negative_samples  # Number of negative examples to sample.
+batch_size = args.batch_size
 
 # Create the directory for TensorBoard variables if there is not.
 if not os.path.exists(args.checkpoint_dir):
@@ -123,8 +129,9 @@ with graph.as_default():
 
     with tf.name_scope('optimizer'):
         # We use the SGD optimizer.
-        optimizer = tf.train.AdamOptimizer().minimize(
-            loss, global_step=global_step)
+        optimizer = tf.train.AdamOptimizer(
+            learning_rate=args.learning_rate).minimize(
+                loss, global_step=global_step)
 
     # TODO this may be a cause of our issues. I'm not sure how variables actually
     # work deep down, but this expression might not do what I think it does.
@@ -152,8 +159,7 @@ with tf.Session(graph=graph) as session:
     if args.restore is not None:
         saver_all.restore(session, args.restore)
 
-    writer = tf.summary.FileWriter("embeddings-skip-gram-summary",
-                                   session.graph)
+    writer = tf.summary.FileWriter(args.summary_dir, session.graph)
 
     for epoch in range(args.max_epochs):
         tf.logging.info("Epoch: {}/{}".format(epoch + 1, args.max_epochs))
@@ -167,7 +173,8 @@ with tf.Session(graph=graph) as session:
             writer.add_summary(summary_str,
                                tf.train.global_step(session, global_step))
 
-            if tf.train.global_step(session, global_step) % 50000 == 0:
+            if tf.train.global_step(
+                    session, global_step) % args.checkpoint_interval == 0:
                 saver_all.save(
                     session,
                     os.path.join(args.checkpoint_dir, 'model'),
