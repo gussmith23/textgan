@@ -19,11 +19,14 @@ parser.add_argument(
 # help='name of the embeddings tensor')
 parser.add_argument(
     '--dataset-name', type=str, required=True, help='name of dataset')
-parser.add_argument(
-    '--filename',
-    type=str,
-    default='tsne-{}.png'.format(time.strftime("%Y%m%d-%H%M%S")))
+parser.add_argument('--filename', type=str)
 args = parser.parse_args()
+
+# The default filename. Can't be set in add_argument because it relies on
+# another flag.
+if args.filename is None:
+    args.filename = 'tsne-{}-{}.png'.format(args.dataset_name,
+                                            time.strftime("%Y%m%d-%H%M%S"))
 
 dataset_name = args.dataset_name
 data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = data.datasets.get(
