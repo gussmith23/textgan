@@ -54,7 +54,6 @@ embedding_size = args.embedding_size
 num_sampled = args.num_negative_samples  # Number of negative examples to sample.
 batch_size = args.batch_size
 
-# Create the directory for TensorBoard variables if there is not.
 if not os.path.exists(args.checkpoint_dir):
     os.makedirs(args.checkpoint_dir)
 
@@ -145,8 +144,6 @@ with graph.as_default():
     normalized_embeddings = tf.identity(
         embeddings / norm, name='normalized_embeddings')
 
-    # Need to understand this better! TF is interesting. This initializes the
-    # above vars (e.g. our embeddings)
     init = tf.global_variables_initializer()
 
     saver_all = tf.train.Saver()
@@ -179,12 +176,6 @@ with tf.Session(graph=graph) as session:
                     session,
                     os.path.join(args.checkpoint_dir, 'model'),
                     global_step=tf.train.global_step(session, global_step))
-                # saver_embeddings.save(
-                # session,
-                # os.path.join(args.checkpoint_dir, 'embeddings'),
-                # global_step=tf.train.global_step(session, global_step))
-                # Save embeddings by pickling, not by checkpointing.
-                # Scratch that, I should actually use np.save().
                 with open(
                         os.path.join(args.checkpoint_dir,
                                      "embeddings-skip-gram-{}.npy".format(
