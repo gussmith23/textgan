@@ -43,10 +43,8 @@ parser.add_argument(
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
-data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = data.datasets.get(
+all_sentences, dictionary, reversed_dictionary = data.datasets.get(
     dataset_name)
-
-all_sentences = reduce(operator.add, data.values(), [])
 
 vocabulary_size = len(dictionary.keys())
 
