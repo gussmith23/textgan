@@ -101,11 +101,8 @@ def batch_gen(data, batch_size=batch_size):
             # hunch it is.
             # We actually permute MORE than they do in Zhang. We shuffle more words.
             idx = range(len(sentence))[:-1]
-            idxs = random.sample(idx, 4)
-            shuffled_idxs = idxs[:]
-            random.shuffle(shuffled_idxs)
-            for i1, i2 in zip(idxs, shuffled_idxs):
-                sentence[i1], sentence[i2] = sentence[i2], sentence[i1]
+            i1, i2 = random.sample(idx, 2)
+            sentence[i1], sentence[i2] = sentence[i2], sentence[i1]
 
         # TODO this is a mess...
         yield np.stack([
