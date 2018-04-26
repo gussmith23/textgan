@@ -29,23 +29,15 @@ if args.filename is None:
                                             time.strftime("%Y%m%d-%H%M%S"))
 
 dataset_name = args.dataset_name
-data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = data.datasets.get(
-    dataset_name)
+_, _, reversed_dictionary = data.datasets.get(dataset_name)
 
-# Get embeddings. TODO i have no clue if this is a good way to do this...
-# embeddings = tf.Variable(
-# -1.0, validate_shape=False, name=args.embeddings_tensor_name)
-# with tf.Session() as sess:
-# tf.train.Saver().restore(sess, args.embeddings_file)
-# embeddings = sess.run(embeddings)
-# embedding_size = embeddings.shape[1]
-# Switched to using saved numpy arrays instead.
 with open(args.embeddings_file, "rb") as f:
     embeddings = np.load(f)
-embedding_size = embeddings.shape[1]
 
 
 # Visualization
+# This code comes from the Tensorflow embeddings tutorial
+# https://www.tensorflow.org/tutorials/word2vec
 def plot_with_labels(low_dim_embs, labels, filename):
     assert low_dim_embs.shape[0] >= len(labels), 'More labels than embeddings'
     plt.figure(figsize=(18, 18))  # in inches
