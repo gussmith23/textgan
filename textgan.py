@@ -148,7 +148,7 @@ lambda_r, lambda_m = 1.0e-2, 1.0e-1
 mmd_val = mmd.rbf_mmd2(features_data, features_generated, sigma=args.mmd_sigma)
 gan_val = tf.reduce_mean(tf.log(y_data)) + tf.reduce_mean(
     tf.log(1 - y_generated))
-recon_val = tf.reduce_sum(tf.norm(z_prior - encoding_generated, axis=1))
+recon_val = tf.reduce_mean(tf.norm(z_prior - encoding_generated, axis=1))
 d_loss = -gan_val + lambda_r * recon_val - lambda_m * mmd_val
 g_loss = mmd_val
 
