@@ -43,8 +43,8 @@ parser.add_argument(
     help=
     'checkpoint filepath containing pretrained generator weights and biases')
 parser.add_argument('--max-epoch', type=int, default=100000)
-parser.add_argument(
-    '--checkpoint-dir', type=str, required=False, default="textgan")
+parser.add_argument('--checkpoint-dir', type=str, required=True)
+parser.add_argument('--summary-dir', type=str, required=True)
 parser.add_argument('--learning-rate', type=float, default=0.00005)
 parser.add_argument('--gradient-clip', type=float, default=5)
 parser.add_argument('--mmd-sigma', type=float, default=1e1)
@@ -200,7 +200,7 @@ with tf.Session(config=config) as sess:
 
     # Credit to https://blog.altoros.com/visualizing-tensorflow-graphs-with-tensorboard.html
     # for help with summaries.
-    writer = tf.summary.FileWriter("textgan-summary", sess.graph)
+    writer = tf.summary.FileWriter(args.summary_dir, sess.graph)
 
     init = tf.global_variables_initializer()
     sess.run(init)
