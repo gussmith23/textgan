@@ -188,11 +188,7 @@ if args.g_pretrain_filepath is not None:
             'discriminator/encoder_fc_1/bias:0',
             'discriminator/encoder_fc_2/weights:0',
             'discriminator/encoder_fc_2/bias:0',
-            'generator/C:0',
-            'generator/Cb:0',
-            'generator/V:0',
-            'generator/Vb:0',
-        ])
+        ]) + tf.trainable_variables('generator')
     init_g_fn = tf.contrib.framework.assign_from_checkpoint_fn(
         args.g_pretrain_filepath, g_restore_vars)
 
