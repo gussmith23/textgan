@@ -52,5 +52,31 @@ def get_split(name):
 
         return data + (training_data, validation_data, testing_data)
 
+    elif name == 'arxiv':
+        from data.arxiv.arxiv import get_data
+        data = get_data()
+
+        all_sentences = data[0]
+
+        rand_state = random.getstate()
+        random.seed(23)  # make the results reproducible!
+        random.shuffle(all_sentences)
+        random.setstate(rand_state)
+
+        training = .6
+        validation = .2
+        test = .2
+        assert (training + validation + test == 1)
+
+        num_training = int(training * len(all_sentences))
+        num_validation = int(validation * len(all_sentences))
+
+        training_data = all_sentences[:num_training]
+        validation_data = all_sentences[num_training:
+                                        num_training + num_validation]
+        testing_data = all_sentences[num_training + num_validation:]
+
+        return data + (training_data, validation_data, testing_data)
+
     else:
         raise ValueError("Unrecognized dataset {}.".format(name))

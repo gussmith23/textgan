@@ -34,7 +34,7 @@ parser.add_argument('--restore', type=str)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
-data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary, training_data, validation_data, testing_data = data.datasets.get_split(
+data, dictionary, reversed_dictionary, training_data, validation_data, testing_data = data.datasets.get_split(
     dataset_name)
 num_classes = len(dictionary)
 batch_size = args.batch_size
