@@ -28,7 +28,8 @@ parser.add_argument('--max-epoch', type=int, default=100)
 parser.add_argument('--batch-size', type=int, default=16)
 # This is specified in Zhang 2017.
 parser.add_argument('--learning-rate', type=float, default=0.00005)
-parser.add_argument('--checkpoint-dir', type=str)
+parser.add_argument('--checkpoint-dir', type=str, required=True)
+parser.add_argument('--summary-dir', type=str, required=True)
 parser.add_argument('--restore', type=str)
 args = parser.parse_args()
 
@@ -168,8 +169,7 @@ with tf.Session(config=config) as sess:
 
     # Credit to https://blog.altoros.com/visualizing-tensorflow-graphs-with-tensorboard.html
     # for help with summaries.
-    writer = tf.summary.FileWriter("pretrain-discriminator-summary",
-                                   sess.graph)
+    writer = tf.summary.FileWriter(args.summary_dir, sess.graph)
 
     tf.logging.info("Beginnning training.")
 
