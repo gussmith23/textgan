@@ -47,7 +47,7 @@ parser.add_argument('--checkpoint-dir', type=str, required=True)
 parser.add_argument('--summary-dir', type=str, required=True)
 parser.add_argument('--learning-rate', type=float, default=0.00005)
 parser.add_argument('--gradient-clip', type=float, default=5)
-parser.add_argument('--mmd-sigma', type=float, default=1e1)
+parser.add_argument('--mmd-sigma', type=float, default=5e0)
 parser.add_argument(
     '--g-it-per-d-it',
     help="Number of training iterations for g, for every d training iteration",
@@ -130,7 +130,8 @@ y_data, y_generated = tf.nn.softmax(logits_data), tf.nn.softmax(
 y_data, y_generated = y_data[:, 0], y_generated[:, 0]
 
 # Loss, as described in Zhang 2017
-lambda_r, lambda_m = 1.0, 1.0
+# Lambda values meant to weight gan ~= recon > mmd
+lambda_r, lambda_m = 1.0e-2, 1.0e-1
 mmd_val = mmd.rbf_mmd2(features_data, features_generated, sigma=args.mmd_sigma)
 gan_val = tf.reduce_mean(tf.log(y_data)) + tf.reduce_mean(
     tf.log(1 - y_generated))
