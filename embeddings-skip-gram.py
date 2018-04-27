@@ -34,7 +34,7 @@ parser.add_argument('--restore', type=str)
 parser.add_argument('--embedding-size', type=int, default=128)
 parser.add_argument('--num-negative-samples', type=int, default=64)
 parser.add_argument('--batch-size', type=int, default=16)
-parser.add_argument('--learning-rate', type=float, default=0.0005)
+parser.add_argument('--learning-rate', type=float, default=0.00005)
 parser.add_argument(
     '--checkpoint-interval',
     type=int,
