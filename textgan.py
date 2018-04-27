@@ -76,6 +76,20 @@ with open(args.embeddings_file, "rb") as f:
 embedding_size = embeddings.shape[1]
 
 
+# https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard
+def variable_summaries(var):
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    with tf.name_scope('{}-summaries'.format(var.op.name)):
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean', mean)
+        with tf.name_scope('stddev'):
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+        tf.summary.scalar('stddev', stddev)
+        tf.summary.scalar('max', tf.reduce_max(var))
+        tf.summary.scalar('min', tf.reduce_min(var))
+        tf.summary.histogram('histogram', var)
+
+
 def batch_gen():
     """
   Returns a TensorArray, not a Tensor.
@@ -160,6 +174,9 @@ g_capped_gvs = [(tf.clip_by_value(grad, -args.gradient_clip,
                                   args.gradient_clip), var)
                 for grad, var in g_gvs]
 g_train_op = optimizer.apply_gradients(g_capped_gvs, global_step=global_step)
+
+for var in tf.trainable_variables():
+    variable_summaries(var)
 
 merged_summary_op = tf.summary.merge_all()
 
