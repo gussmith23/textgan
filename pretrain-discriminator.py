@@ -23,7 +23,7 @@ parser.add_argument(
     help='filepath of the embeddings file to use')
 parser.add_argument(
     '--dataset-name', type=str, required=True, help='name of dataset')
-parser.add_argument('--max-epoch', type=int, default=100)
+parser.add_argument('--max-epoch', type=int, default=10000)
 # This is specified in Zhang 2017.
 parser.add_argument('--batch-size', type=int, default=16)
 # This is specified in Zhang 2017.
