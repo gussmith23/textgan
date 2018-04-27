@@ -56,10 +56,9 @@ parser.add_argument(
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
-data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = data.datasets.get(
-    dataset_name)
+data, dictionary, reversed_dictionary = data.datasets.get(dataset_name)
 num_classes = len(dictionary)
-all_sentences = reduce(operator.add, data.values(), [])
+all_sentences = data
 random.shuffle(all_sentences)
 batch_size = 8
 z_prior_size = 900
