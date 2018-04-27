@@ -28,13 +28,7 @@ parser.add_argument('--max-epoch', type=int, default=100)
 parser.add_argument('--batch-size', type=int, default=16)
 # This is specified in Zhang 2017.
 parser.add_argument('--learning-rate', type=float, default=0.00005)
-parser.add_argument(
-    '--checkpoint-dir',
-    type=str,
-    required=False,
-    help=
-    'directory containing latest checkpoint. if this flag is set, the model will be restored from this location.',
-    default="pretrain-discriminator")
+parser.add_argument('--checkpoint-dir', type=str)
 parser.add_argument('--restore', type=str)
 args = parser.parse_args()
 
