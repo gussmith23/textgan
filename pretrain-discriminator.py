@@ -47,6 +47,20 @@ with open(args.embeddings_file, "rb") as f:
 embedding_size = embeddings.shape[1]
 
 
+# https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard
+def variable_summaries(var):
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    with tf.name_scope('{}-summaries'.format(var.op.name)):
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean', mean)
+        with tf.name_scope('stddev'):
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+        tf.summary.scalar('stddev', stddev)
+        tf.summary.scalar('max', tf.reduce_max(var))
+        tf.summary.scalar('min', tf.reduce_min(var))
+        tf.summary.histogram('histogram', var)
+
+
 # TODO though we call it "batch_size", the real batch size is 2*batch_size.
 def batch_gen(data, batch_size=batch_size):
     """
@@ -122,8 +136,15 @@ x_data = tf.placeholder(
 x_data_tweaked = tf.placeholder(
     dtype=tf.float32, shape=[batch_size, sentence_length, embedding_size])
 
-logits_data, logits_tweaked, _, _, _, _, d_params = build_discriminator(
+logits_data, logits_tweaked, _, _, _, _, _ = build_discriminator(
     x_data, x_data_tweaked, batch_size, sentence_length, embedding_size)
+
+var_list = tf.trainable_variables(
+    "discriminator/conv") + tf.trainable_variables(
+        "discriminator/discriminator_fc_1") + tf.trainable_variables(
+            "discriminator/discriminator_fc_2")
+for var in var_list:
+    variable_summaries(var)
 
 global_step = tf.Variable(0, name='global_step', trainable=False)
 
@@ -132,11 +153,11 @@ d_loss = tf.reduce_sum(
     tf.nn.sparse_softmax_cross_entropy_with_logits(
         logits=tf.concat([logits_data, logits_tweaked], axis=0),
         labels=tf.constant([0] * batch_size + [1] * batch_size)))
-d_loss_summary = tf.summary.scalar("d_loss", d_loss)
+tf.summary.scalar("d_loss", d_loss)
 
 optimizer = tf.train.AdamOptimizer(args.learning_rate)
 d_trainer = optimizer.minimize(
-    d_loss, var_list=d_params, global_step=global_step)
+    d_loss, var_list=var_list, global_step=global_step)
 predicted = tf.argmax(tf.concat([logits_data, logits_tweaked], axis=0), axis=1)
 labels = tf.constant([0] * batch_size + [1] * batch_size, dtype=tf.int64)
 accuracy = tf.reduce_mean(
@@ -152,9 +173,9 @@ init_l = tf.local_variables_initializer()
 # The second saver is for restoring the weights for use in other networks.
 # TODO should probably save specific variables.
 saver_all = tf.train.Saver()
-saver_just_weights_and_biases = tf.train.Saver(
-    var_list=tf.get_collection(
-        tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator"))
+saver_just_weights_and_biases = tf.train.Saver(var_list=var_list)
+
+merged_summary_op = tf.summary.merge_all()
 
 # TODO this is needed on Windows
 # https://stackoverflow.com/questions/41117740/tensorflow-crashes-with-cublas-status-alloc-failed?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
@@ -192,7 +213,7 @@ with tf.Session(config=config) as sess:
             # which creates new nodes.
 
             summary_str, _ = sess.run(
-                [d_loss_summary, d_trainer],
+                [merged_summary_op, d_trainer],
                 feed_dict={
                     x_data: pure_sentences,
                     x_data_tweaked: tweaked_sentences
