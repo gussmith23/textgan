@@ -53,6 +53,7 @@ parser.add_argument(
     help="Number of training iterations for g, for every d training iteration",
     type=int,
     default=5)
+parser.add_argument('--restore', type=str)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -226,6 +227,9 @@ with tf.Session(config=config) as sess:
         init_d_fn(sess)
     if args.g_pretrain_filepath is not None:
         init_g_fn(sess)
+
+    if args.restore is not None:
+        saver.restore(sess, args.restore)
 
     num_batches = len(all_sentences) // batch_size
 
