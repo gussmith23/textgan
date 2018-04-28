@@ -29,10 +29,9 @@ parser.add_argument('--restore', type=str)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
-data, dictionary, reversed_dictionary, sender_dictionary, reversed_sender_dictionary = data.datasets.get(
-    dataset_name)
+data, dictionary, reversed_dictionary = data.datasets.get(dataset_name)
 num_classes = len(dictionary)
-all_sentences = reduce(operator.add, data.values(), [])
+all_sentences = data
 random.shuffle(all_sentences)
 batch_size = args.batch_size
 end_of_sentence_id = 1  # TODO this should probably come from the data.
