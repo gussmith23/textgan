@@ -57,9 +57,10 @@ parser.add_argument('--restore', type=str)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
-data, dictionary, reversed_dictionary = data.datasets.get(dataset_name)
+data, dictionary, reversed_dictionary, training_data, validation_data, testing_data = data.datasets.get_split(
+    dataset_name)
 num_classes = len(dictionary)
-all_sentences = data
+all_sentences = training_data
 random.shuffle(all_sentences)
 batch_size = 8
 z_prior_size = 900
