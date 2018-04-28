@@ -46,6 +46,20 @@ with open(args.embeddings_file, "rb") as f:
 embedding_size = embeddings.shape[1]
 
 
+# https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard
+def variable_summaries(var):
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    with tf.name_scope('{}-summaries'.format(var.op.name)):
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean', mean)
+        with tf.name_scope('stddev'):
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+        tf.summary.scalar('stddev', stddev)
+        tf.summary.scalar('max', tf.reduce_max(var))
+        tf.summary.scalar('min', tf.reduce_min(var))
+        tf.summary.histogram('histogram', var)
+
+
 def batch_gen(batch_size=batch_size):
 
     i = 0
@@ -84,11 +98,12 @@ x_generated_ids, x_generated, g_params, total_log_probability = build_generator(
 
 global_step = tf.Variable(0, name='global_step', trainable=False)
 
-var_list = tf.get_collection(
-    tf.GraphKeys.GLOBAL_VARIABLES, scope="generator") + tf.get_collection(
-        tf.GraphKeys.GLOBAL_VARIABLES,
-        scope="discriminator/encoder_fc_1") + tf.get_collection(
-            tf.GraphKeys.GLOBAL_VARIABLES, scope="discriminator/encoder_fc_2")
+var_list = tf.trainable_variables("generator") + tf.trainable_variables(
+    "discriminator/conv") + tf.trainable_variables(
+        "discriminator/encoder_fc_1") + tf.trainable_variables(
+            "discriminator/encoder_fc_2")
+for var in var_list:
+    variable_summaries(var)
 
 loss = tf.reduce_sum(total_log_probability)
 optimizer = tf.train.AdamOptimizer(
