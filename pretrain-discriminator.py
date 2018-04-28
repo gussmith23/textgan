@@ -136,7 +136,7 @@ x_data = tf.placeholder(
 x_data_tweaked = tf.placeholder(
     dtype=tf.float32, shape=[batch_size, sentence_length, embedding_size])
 
-logits_data, logits_tweaked, _, _, _, _, _ = build_discriminator(
+logits_data, logits_tweaked, _, _, _, _ = build_discriminator(
     x_data, x_data_tweaked, batch_size, sentence_length, embedding_size)
 
 var_list = tf.trainable_variables(

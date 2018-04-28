@@ -37,18 +37,6 @@ def build_generator(z_prior,
         #cell = tf.nn.rnn_cell.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
         init_state = cell.zero_state(batch_size, tf.float32)
 
-        V = tf.get_variable(
-            'V', [hidden_layer_size, num_classes],
-            initializer=tf.truncated_normal_initializer())
-        Vb = tf.get_variable(
-            'Vb', [num_classes], initializer=tf.constant_initializer(0.0))
-        C = tf.get_variable(
-            'C', [z_prior_size, hidden_layer_size],
-            initializer=tf.truncated_normal_initializer())
-        Cb = tf.get_variable(
-            'Cb', [hidden_layer_size],
-            initializer=tf.constant_initializer(0.0))
-
         total_log_probability = None
         if real_sentences is not None:
             # See Gan 2016 section 2.1 (LSTM decoder) for an explanation
@@ -66,12 +54,22 @@ def build_generator(z_prior,
                 # TODO not sure about this
                 # what i do know is that, according to the __call__ method of cells,
                 # the state shape should be [batch size, state size], or [1, state size] for  us
-                h1 = tf.tanh(tf.matmul(z_prior, C) + Cb)
+                # tf.tanh(tf.matmul(z_prior, C) + Cb)
+                with tf.variable_scope('C', reuse=tf.AUTO_REUSE):
+                    h1 = tf.layers.dense(
+                        z_prior,
+                        hidden_layer_size,
+                        activation=tf.tanh,
+                        kernel_regularizer=None,  # TODO
+                        bias_regularizer=None)
                 next_cell_state = tf.contrib.rnn.LSTMStateTuple(
                     c=init_state.c, h=h1)
+
+                h = h1
+
                 # [batch_size, num_classes]
-                mul = tf.matmul(h1, V) + Vb
-                next_word_id = tf.argmax(mul, axis=1)
+                # mul = tf.matmul(h1, V) + Vb
+                # next_word_id = tf.argmax(mul, axis=1)
                 # TODO C is NaN when running textgan!
                 # but after a single batch?
                 # maybe gradient needs to be clipped!
@@ -82,8 +80,8 @@ def build_generator(z_prior,
                 # between the loss function and the variables V, Vb, etc.
                 # The other way is to use something like REINFORCE, but zhang thankfully
                 # proposes this simpler solution.
-                next_word = tf.matmul(
-                    tf.nn.softmax(L * mul, axis=1), embeddings)
+                # next_word = tf.matmul(
+                # tf.nn.softmax(L * mul, axis=1), embeddings)
                 # This is the old way
                 #next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
 
@@ -113,13 +111,20 @@ def build_generator(z_prior,
                 # Note: moved this below
                 emit_output = loop_state
                 next_cell_state = cell_state
-                mul = tf.matmul(cell_state.h, V) + Vb
-                next_word_id = tf.argmax(mul, axis=1)
-                # see above for the explanation of this soft-argmax
-                next_word = tf.matmul(
-                    tf.nn.softmax(L * mul, axis=1), embeddings)
-                #next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
-                # next_loop_state = (next_word_id, next_word)
+                h = next_cell_state.h
+
+            with tf.variable_scope('V', reuse=tf.AUTO_REUSE):
+                mul = tf.layers.dense(
+                    h,
+                    num_classes,
+                    activation=None,
+                    kernel_regularizer=None,  # TODO
+                    bias_regularizer=None)
+            next_word_id = tf.argmax(mul, axis=1)
+            # see above for the explanation of this soft-argmax
+            next_word = tf.matmul(tf.nn.softmax(L * mul, axis=1), embeddings)
+            #next_word = tf.map_fn(lambda id: tf.nn.embedding_lookup(embeddings, id), next_word_id, dtype=tf.float32)
+            # next_loop_state = (next_word_id, next_word)
 
             # TODO this should be improved
             elements_finished = (time >= max_sentence_length)
@@ -188,4 +193,4 @@ def build_generator(z_prior,
         # must transpose first two dimensions from [sentence_length, batch_size]
         # to [batch_size, sentence_length]
         return _transpose_batch_time(word_ids.stack()), _transpose_batch_time(
-            words.stack()), [V, Vb, C, Cb], out_log_prob
+            words.stack()), out_log_prob

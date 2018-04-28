@@ -81,11 +81,11 @@ sentences_as_embeddings = tf.map_fn(
 empty = tf.zeros(
     [batch_size, sentence_length, embedding_size], dtype=tf.float32)
 
-_, _, encoding, _, _, _, d_params = build_discriminator(
-    sentences_as_embeddings, empty, batch_size, sentence_length,
-    embedding_size)
+_, _, encoding, _, _, _ = build_discriminator(sentences_as_embeddings, empty,
+                                              batch_size, sentence_length,
+                                              embedding_size)
 
-x_generated_ids, x_generated, g_params, total_log_probability = build_generator(
+x_generated_ids, x_generated, total_log_probability = build_generator(
     encoding,
     embeddings,
     num_classes,

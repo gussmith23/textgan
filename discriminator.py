@@ -31,34 +31,53 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
             # from Kim 2014: filter windows (h) of 3, 4, 5 with 100 feature maps each
             # TODO how do i handle 3, 4, and 5 simultaneously? can i?
             num_filters = 300
-            conv1_filter_3 = tf.Variable(
-                tf.random_normal([3, embedding_size, 1, num_filters]),
-                name="weights_3")
-            conv1_filter_4 = tf.Variable(
-                tf.random_normal([4, embedding_size, 1, num_filters]),
-                name="weights_4")
-            conv1_filter_5 = tf.Variable(
-                tf.random_normal([5, embedding_size, 1, num_filters]),
-                name="weights_5")
-            # TODO should each set of weights have its own bias?
-            conv1_bias = tf.Variable(tf.zeros([num_filters]), name="bias")
+            # conv1_filter_3 = tf.Variable(
+            # tf.random_normal([3, embedding_size, 1, num_filters]),
+            # name="weights_3")
+            # conv1_filter_4 = tf.Variable(
+            # tf.random_normal([4, embedding_size, 1, num_filters]),
+            # name="weights_4")
+            # conv1_filter_5 = tf.Variable(
+            # tf.random_normal([5, embedding_size, 1, num_filters]),
+            # name="weights_5")
+            # # TODO should each set of weights have its own bias?
+            # conv1_bias = tf.Variable(tf.zeros([num_filters]), name="bias")
 
-            # TODO we probably shouldn't have sentences of less than length 3, if we're doing this.
-            conv_3 = tf.nn.conv2d(
-                x_in, conv1_filter_3, [1, 1, 1, 1], padding='VALID')
-            conv_4 = tf.nn.conv2d(
-                x_in, conv1_filter_4, [1, 1, 1, 1], padding='VALID')
-            conv_5 = tf.nn.conv2d(
-                x_in, conv1_filter_5, [1, 1, 1, 1], padding='VALID')
+            # # TODO we probably shouldn't have sentences of less than length 3, if we're doing this.
+            # conv_3 = tf.nn.conv2d(
+            # x_in, conv1_filter_3, [1, 1, 1, 1], padding='VALID')
+            # conv_4 = tf.nn.conv2d(
+            # x_in, conv1_filter_4, [1, 1, 1, 1], padding='VALID')
+            # conv_5 = tf.nn.conv2d(
+            # x_in, conv1_filter_5, [1, 1, 1, 1], padding='VALID')
 
-            conv_3 += conv1_bias
-            conv_4 += conv1_bias
-            conv_5 += conv1_bias
+            conv_3 = tf.layers.conv2d(
+                inputs=x_in,
+                filters=num_filters,
+                kernel_size=[3, embedding_size],
+                padding="valid",
+                activation=tf.nn.tanh)
+            conv_4 = tf.layers.conv2d(
+                inputs=x_in,
+                filters=num_filters,
+                kernel_size=[4, embedding_size],
+                padding="valid",
+                activation=tf.nn.tanh)
+            conv_5 = tf.layers.conv2d(
+                inputs=x_in,
+                filters=num_filters,
+                kernel_size=[5, embedding_size],
+                padding="valid",
+                activation=tf.nn.tanh)
+
+            # conv_3 += conv1_bias
+            # conv_4 += conv1_bias
+            # conv_5 += conv1_bias
 
             # TODO the paper uses tanh, but TF loves RELU; could try both.
-            conv1_3 = tf.nn.tanh(conv_3, name=scope.name + "_3")
-            conv1_4 = tf.nn.tanh(conv_4, name=scope.name + "_4")
-            conv1_5 = tf.nn.tanh(conv_5, name=scope.name + "_5")
+            # conv1_3 = tf.nn.tanh(conv_3, name=scope.name + "_3")
+            # conv1_4 = tf.nn.tanh(conv_4, name=scope.name + "_4")
+            # conv1_5 = tf.nn.tanh(conv_5, name=scope.name + "_5")
 
         # conv1 should be shape [batch_size, sentence_length - (num_words-1), 1, num_filters]
         # TODO could make this an assert if you want...
@@ -67,9 +86,9 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
         # the output of reduce_max is [2*batch_size,1,num_filters]. we concat along the filters axis.
         pool1 = tf.concat(
             [
-                tf.reduce_max(conv1_3, axis=1),
-                tf.reduce_max(conv1_4, axis=1),
-                tf.reduce_max(conv1_5, axis=1)
+                tf.reduce_max(conv_3, axis=1),
+                tf.reduce_max(conv_4, axis=1),
+                tf.reduce_max(conv_5, axis=1)
             ],
             axis=2)
         # pool1 = tf.nn.max_pool(conv1, ksize=[1, tf.size(conv1)[1], 1, 1], strides=[1, 1, 1, 1],
@@ -95,46 +114,70 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
         dim = tf.shape(reshape)[1]
 
         with tf.variable_scope('discriminator_fc_1') as scope:
-            d_fc_1_weights = tf.Variable(
-                tf.random_normal([dim, 200]),
-                validate_shape=False,
-                name="weights")
-            d_fc_1_bias = tf.Variable(
-                tf.zeros([200]), name="bias")
-            d_fc_1 = tf.sigmoid(
-                tf.matmul(reshape, d_fc_1_weights) + d_fc_1_bias)
-            d_fc_1 = tf.identity(d_fc_1, name=scope.name)
+            # d_fc_1_weights = tf.Variable(
+            # tf.random_normal([dim, 200]),
+            # validate_shape=False,
+            # name="weights")
+            # d_fc_1_bias = tf.Variable(
+            # tf.zeros([200]), name="bias")
+            # d_fc_1 = tf.sigmoid(
+            # tf.matmul(reshape, d_fc_1_weights) + d_fc_1_bias)
+            # d_fc_1 = tf.identity(d_fc_1, name=scope.name)
+            d_fc_1 = tf.contrib.layers.fully_connected(
+                reshape,
+                200,
+                weights_regularizer=None,  # TODO
+                biases_regularizer=None,
+                activation_fn=tf.nn.sigmoid)
 
         with tf.variable_scope('discriminator_fc_2') as scope:
-            d_fc_2_weights = tf.Variable(
-                tf.random_normal([200, 2]),
-                validate_shape=False,
-                name="weights")
-            d_fc_2_bias = tf.Variable(
-                tf.zeros([2]), name="bias")
-            d_fc_2 = tf.matmul(d_fc_1, d_fc_2_weights) + d_fc_2_bias
-            d_fc_2 = tf.identity(d_fc_2, name=scope.name)
+            # d_fc_2_weights = tf.Variable(
+            # tf.random_normal([200, 2]),
+            # validate_shape=False,
+            # name="weights")
+            # d_fc_2_bias = tf.Variable(
+            # tf.zeros([2]), name="bias")
+            # d_fc_2 = tf.matmul(d_fc_1, d_fc_2_weights) + d_fc_2_bias
+            # d_fc_2 = tf.identity(d_fc_2, name=scope.name)
+            d_fc_2 = tf.contrib.layers.fully_connected(
+                d_fc_1,
+                2,
+                weights_regularizer=None,  # TODO
+                biases_regularizer=None,
+                activation_fn=tf.nn.sigmoid)
 
         with tf.variable_scope('encoder_fc_1') as scope:
-            e_fc_1_weights = tf.Variable(
-                tf.random_normal([dim, 900]),
-                validate_shape=False,
-                name="weights")
-            e_fc_1_bias = tf.Variable(
-                tf.zeros([900]), name="bias")
-            e_fc_1 = tf.sigmoid(
-                tf.matmul(reshape, e_fc_1_weights) + e_fc_1_bias)
-            e_fc_1 = tf.identity(e_fc_1, name=scope.name)
+            # e_fc_1_weights = tf.Variable(
+            # tf.random_normal([dim, 900]),
+            # validate_shape=False,
+            # name="weights")
+            # e_fc_1_bias = tf.Variable(
+            # tf.zeros([900]), name="bias")
+            # e_fc_1 = tf.sigmoid(
+            # tf.matmul(reshape, e_fc_1_weights) + e_fc_1_bias)
+            # e_fc_1 = tf.identity(e_fc_1, name=scope.name)
+            e_fc_1 = tf.contrib.layers.fully_connected(
+                reshape,
+                900,
+                weights_regularizer=None,  # TODO
+                biases_regularizer=None,
+                activation_fn=tf.nn.sigmoid)
 
         with tf.variable_scope('encoder_fc_2') as scope:
-            e_fc_2_weights = tf.Variable(
-                tf.random_normal([900, 900]),
-                validate_shape=False,
-                name="weights")
-            e_fc_2_bias = tf.Variable(
-                tf.zeros([900]), name="bias")
-            e_fc_2 = tf.matmul(e_fc_1, e_fc_2_weights) + e_fc_2_bias
-            e_fc_2 = tf.identity(e_fc_2, name=scope.name)
+            # e_fc_2_weights = tf.Variable(
+            # tf.random_normal([900, 900]),
+            # validate_shape=False,
+            # name="weights")
+            # e_fc_2_bias = tf.Variable(
+            # tf.zeros([900]), name="bias")
+            # e_fc_2 = tf.matmul(e_fc_1, e_fc_2_weights) + e_fc_2_bias
+            # e_fc_2 = tf.identity(e_fc_2, name=scope.name)
+            e_fc_2 = tf.contrib.layers.fully_connected(
+                e_fc_1,
+                900,
+                weights_regularizer=None,  # TODO
+                biases_regularizer=None,
+                activation_fn=tf.nn.sigmoid)
 
         # Note that we don't do softmax on these. In our pre-training setup,
         # we use softmax_cross_entropy_on_logits or whatever it's called,
@@ -161,8 +204,4 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
         # tf.nn.softmax(tf.slice(fc, [batch_size, 0], [-1, -1], name=None)),
         # [0, 0], [-1, 1])
 
-        return logits_data, logits_generated, encoding_data, encoding_generated, features_data, features_generated, [
-            conv1_filter_3, conv1_filter_4, conv1_filter_5, conv1_bias,
-            d_fc_1_weights, d_fc_1_bias, d_fc_2_weights, d_fc_2_bias,
-            e_fc_1_weights, e_fc_1_bias, e_fc_2_weights, e_fc_2_bias
-        ]
+        return logits_data, logits_generated, encoding_data, encoding_generated, features_data, features_generated

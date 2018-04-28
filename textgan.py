@@ -122,7 +122,7 @@ global_step = tf.Variable(0, name='global_step', trainable=False)
 z_prior = tf.placeholder(
     tf.float32, [batch_size, z_prior_size], name="z_prior")
 
-x_generated_ids, x_generated, g_params, _ = build_generator(
+x_generated_ids, x_generated, _ = build_generator(
     z_prior, embeddings, num_classes, hidden_layer_size, embedding_size,
     z_prior_size, max_sentence_length)
 
@@ -135,7 +135,7 @@ x_generated_ids, x_generated, g_params, _ = build_generator(
 x_data = tf.placeholder(tf.float32,
                         [batch_size, max_sentence_length, embedding_size])
 
-logits_data, logits_generated, encoding_data, encoding_generated, features_data, features_generated, d_params = build_discriminator(
+logits_data, logits_generated, encoding_data, encoding_generated, features_data, features_generated = build_discriminator(
     x_data, x_generated, batch_size, max_sentence_length, embedding_size)
 y_data, y_generated = tf.nn.softmax(logits_data), tf.nn.softmax(
     logits_generated)
@@ -188,14 +188,16 @@ saver = tf.train.Saver()
 if args.d_pretrain_filepath is not None:
     d_restore_vars = tf.contrib.framework.get_variables_to_restore(
         include=[
-            'discriminator/conv/weights_3:0',
-            'discriminator/conv/weights_4:0',
-            'discriminator/conv/weights_5:0',
-            'discriminator/conv/bias:0',
-            'discriminator/discriminator_fc_1/weights:0',
-            'discriminator/discriminator_fc_1/bias:0',
-            'discriminator/discriminator_fc_2/weights:0',
-            'discriminator/discriminator_fc_2/bias:0',
+            'discriminator/conv/conv2d/kernel:0',
+            'discriminator/conv/conv2d_1/kernel:0',
+            'discriminator/conv/conv2d_2/kernel:0',
+            'discriminator/conv/conv2d/bias:0',
+            'discriminator/conv/conv2d_1/bias:0',
+            'discriminator/conv/conv2d_2/bias:0',
+            'discriminator/discriminator_fc_1/fully_connected/kernel:0',
+            'discriminator/discriminator_fc_1/fully_connected/bias:0',
+            'discriminator/discriminator_fc_2/fully_connected/kernel:0',
+            'discriminator/discriminator_fc_2/fully_connected/bias:0',
         ])
     init_d_fn = tf.contrib.framework.assign_from_checkpoint_fn(
         args.d_pretrain_filepath, d_restore_vars)
@@ -203,10 +205,10 @@ if args.d_pretrain_filepath is not None:
 if args.g_pretrain_filepath is not None:
     g_restore_vars = tf.contrib.framework.get_variables_to_restore(
         include=[
-            'discriminator/encoder_fc_1/weights:0',
-            'discriminator/encoder_fc_1/bias:0',
-            'discriminator/encoder_fc_2/weights:0',
-            'discriminator/encoder_fc_2/bias:0',
+            'discriminator/encoder_fc_1/fully_connected/kernel:0',
+            'discriminator/encoder_fc_1/fully_connected/bias:0',
+            'discriminator/encoder_fc_2/fully_connected/kernel:0',
+            'discriminator/encoder_fc_2/fully_connected/bias:0',
         ]) + tf.trainable_variables('generator')
     init_g_fn = tf.contrib.framework.assign_from_checkpoint_fn(
         args.g_pretrain_filepath, g_restore_vars)
