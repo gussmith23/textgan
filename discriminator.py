@@ -42,8 +42,8 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
                 name="weights_5")
             # TODO should each set of weights have its own bias?
             conv1_bias = tf.Variable(
-                tf.random_normal([num_filters]),
-                name="bias")  # TODO initialize to zero?
+                tf.zeros([num_filters]),
+                name="bias")
 
             # TODO we probably shouldn't have sentences of less than length 3, if we're doing this.
             conv_3 = tf.nn.conv2d(
@@ -102,8 +102,7 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
                 validate_shape=False,
                 name="weights")
             d_fc_1_bias = tf.Variable(
-                tf.random_normal([200]),
-                name="bias")  # TODO initialize to zero?
+                tf.zeros([200]), name="bias")
             d_fc_1 = tf.sigmoid(
                 tf.matmul(reshape, d_fc_1_weights) + d_fc_1_bias)
             d_fc_1 = tf.identity(d_fc_1, name=scope.name)
@@ -114,7 +113,7 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
                 validate_shape=False,
                 name="weights")
             d_fc_2_bias = tf.Variable(
-                tf.random_normal([2]), name="bias")  # TODO initialize to zero?
+                tf.zeros([2]), name="bias")
             d_fc_2 = tf.matmul(d_fc_1, d_fc_2_weights) + d_fc_2_bias
             d_fc_2 = tf.identity(d_fc_2, name=scope.name)
 
@@ -124,8 +123,7 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
                 validate_shape=False,
                 name="weights")
             e_fc_1_bias = tf.Variable(
-                tf.random_normal([900]),
-                name="bias")  # TODO initialize to zero?
+                tf.zeros([900]), name="bias")
             e_fc_1 = tf.sigmoid(
                 tf.matmul(reshape, e_fc_1_weights) + e_fc_1_bias)
             e_fc_1 = tf.identity(e_fc_1, name=scope.name)
@@ -136,8 +134,7 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
                 validate_shape=False,
                 name="weights")
             e_fc_2_bias = tf.Variable(
-                tf.random_normal([900]),
-                name="bias")  # TODO initialize to zero?
+                tf.zeros([900]), name="bias")
             e_fc_2 = tf.matmul(e_fc_1, e_fc_2_weights) + e_fc_2_bias
             e_fc_2 = tf.identity(e_fc_2, name=scope.name)
 
