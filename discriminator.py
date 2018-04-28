@@ -41,9 +41,7 @@ def build_discriminator(x_data, x_generated, batch_size, sentence_length,
                 tf.random_normal([5, embedding_size, 1, num_filters]),
                 name="weights_5")
             # TODO should each set of weights have its own bias?
-            conv1_bias = tf.Variable(
-                tf.zeros([num_filters]),
-                name="bias")
+            conv1_bias = tf.Variable(tf.zeros([num_filters]), name="bias")
 
             # TODO we probably shouldn't have sentences of less than length 3, if we're doing this.
             conv_3 = tf.nn.conv2d(
