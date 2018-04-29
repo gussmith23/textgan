@@ -3,7 +3,7 @@ from tensorflow.python.ops.rnn import _transpose_batch_time
 
 # soft-argmax approximation (section 2.5 of zhang)
 # not sure what to set it to; they don't discuss.
-L = 100
+L = 2
 
 
 # TODO some of these should be discoverable via tf.shape i think.
