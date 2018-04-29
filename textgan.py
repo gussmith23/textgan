@@ -147,7 +147,7 @@ y_data, y_generated = y_data[:, 0], y_generated[:, 0]
 
 # Loss, as described in Zhang 2017
 # Lambda values meant to weight gan ~= recon > mmd
-lambda_r, lambda_m = 1.0e-2, 1.0e-1
+lambda_r, lambda_m = 1.0e-2, 1.0e-2
 mmd_val = mmd.mix_rbf_mmd2(
     features_data, features_generated, sigmas=args.mmd_sigmas)
 gan_val = tf.reduce_mean(tf.log(y_data)) + tf.reduce_mean(
