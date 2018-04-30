@@ -254,7 +254,6 @@ with tf.Session(config=config) as sess:
             if g_step % (args.g_it_per_d_it + 1) == (g_step // (
                     args.g_it_per_d_it + 1)) % (args.g_it_per_d_it + 1):
                 tf.logging.info("Running D.")
-                d_it += 1
 
                 summary_str, _ = sess.run(
                     [merged_summary_op, d_train_op],
