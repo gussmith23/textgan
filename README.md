@@ -93,8 +93,8 @@ python pretrain-generator.py --dataset arxiv                                    
 ### Training TextGAN
 Training will emit checkpoint files that can be used by the sentence generation script below.
 ```shell
-python textgan.py --dataset-name arxiv \
-    --embeddings-file saved-checkpoints/arxiv-embeddings-skip-gram-3050000.npy                  \ 
+python textgan.py --dataset-name arxiv                                                          \
+    --embeddings-file saved-checkpoints/arxiv-embeddings-skip-gram-3050000.npy                  \
     --checkpoint-dir arxiv-textgan --summary-dir arxiv-textgan-summary                          \
     --d-pretrain-filepath saved-checkpoints/arxiv-pretrain-discriminator-weights-biases-50000   \
     --g-pretrain-filepath saved-checkpoints/arxiv-pretrain-generator-weights-biases-52000 
