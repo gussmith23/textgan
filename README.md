@@ -110,5 +110,5 @@ python generate-and-score-sentences.py --dataset-name arxiv                     
 python generate-and-score-sentences.py --dataset-name arxiv                     \
     --embeddings-file saved-checkpoints/arxiv-embeddings-skip-gram-3050000.npy  \
     --textgan-filepath saved-checkpoints/arxiv-textgan-model-590000             \
-    --compute-bleu
+    --compute-bleu 1
 ```
