@@ -46,9 +46,49 @@ Third-party scripts:
 - [**tf_ops.py.**](tf_ops.py) Dependency for mmd.py.
 
 Directories:
-- [**data.**](data/README.md) The directory containing our datasets and dataset-getting modules. Please read that directory's README for more information.
+- [**data.**](data) The directory containing our datasets and dataset-getting modules. Please read that directory's README for more information.
 - [**saved-checkpoints.**](saved-checkpoints) Contains important checkpoints saved during the training of our model. These checkpoints are used in the demonstrations below.
 - [**results.**](results) Contains results used in the paper.
 
 Unused files:
 - [**embeddings-cbow.py**](embeddings-cbow.py) Continuous Bag of Words embeddings generation script. Ended up using only the Skip-gram model. However, I keep the CBoW model, as it is allegedly better for smaller datasets. _Warning: it likely will not work in its current state._
+
+
+## Running the Code
+
+If you would simply like to run my trained TextGAN model, skip to the "Generating Sentences" section.
+
+All of the scripts provided have more options than shown here. Use `--help` with any of the scripts to see all flags.
+
+For each command which takes a `--summary-dir` command, TensorBoard can be used to visualize the training. You can start TensorBoard by simply running `tensorboard --logdir <summary-dir>`.
+
+### Generating Embeddings
+This will create .npy versions of the embedding tensors in the checkpoint directory. 
+```shell
+python embeddings-skip-gram.py --dataset-name arxiv --checkpoint-dir arxiv-embeddings --summary-dir arxiv-embeddings-summary
+```
+### Visualize Embeddings
+Unless otherwise specified, this will create a .png file showing the t-SNE embeddings projection in the current directory.
+```shell
+python embeddings-visualize.py --dataset-name arxiv  --embeddings-file saved-checkpoints/babblebuds-embeddings-skip-gram-4750000.npy
+```
+
+### Pretraining Discriminator and Generator
+Pretraining will emit checkpoint files which can be used when training TextGAN. For example, if `checkpoint-dir` is set to "checkpoint", then pretraining will create "checkpoint/weights-biases-<iteration>.<extension>". You can then use this checkpoint in training TextGAN; see the syntax in the section below.
+```shell
+python pretrain-discriminator.py --dataset arxiv --embeddings-file saved-checkpoints/arxiv-embeddings-skip-gram-3050000.npy --checkpoint-dir arxiv-pretrain-discriminator --summary-dir arxiv-pretrain-discriminator-summary
+python pretrain-generator.py --dataset arxiv --embeddings-file saved-checkpoints/arxiv-embeddings-skip-gram-3050000.npy --checkpoint-dir arxiv-pretrain-generator --summary-dir arxiv-pretrain-generator-summary
+```
+
+### Training TextGAN
+Training will emit checkpoint files that can be used by the sentence generation script below.
+```shell
+python textgan.py --dataset-name arxiv --embeddings-file saved-checkpoints/arxiv-embeddings-skip-gram-3050000.npy  --checkpoint-dir arxiv-textgan --summary-dir arxiv-textgan-summary --d-pretrain-filepath saved-checkpoints/arxiv-pretrain-discriminator-weights-biases-50000 --g-pretrain-filepath saved-checkpoints/arxiv-pretrain-generator-weights-biases-52000 
+```
+
+### Generating Sentences
+```shell 
+python generate-and-score-sentences.py --dataset-name arxiv --embeddings-file saved-checkpoints/arxiv-embeddings-skip-gram-3050000.npy --textgan-filepath saved-checkpoints/arxiv-textgan-model-590000
+# Calculate BLEU score 
+python generate-and-score-sentences.py --dataset-name arxiv --embeddings-file saved-checkpoints/arxiv-embeddings-skip-gram-3050000.npy --textgan-filepath saved-checkpoints/arxiv-textgan-model-590000 --compute-bleu
+```
