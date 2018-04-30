@@ -21,6 +21,8 @@ Chin-Yew Lin, Franz Josef Och. ORANGE: a method for evaluating automatic
 evaluation metrics for machine translation. COLING 2004.
 """
 
+# from https://github.com/tensorflow/nmt/blob/master/nmt/scripts/bleu.py
+
 import collections
 import math
 
