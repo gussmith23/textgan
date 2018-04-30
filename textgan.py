@@ -53,7 +53,7 @@ parser.add_argument(
     '--g-it-per-d-it',
     help="Number of training iterations for g, for every d training iteration",
     type=int,
-    default=5)
+    default=25)
 parser.add_argument('--restore', type=str)
 args = parser.parse_args()
 
@@ -147,7 +147,7 @@ y_data, y_generated = y_data[:, 0], y_generated[:, 0]
 
 # Loss, as described in Zhang 2017
 # Lambda values meant to weight gan ~= recon > mmd
-lambda_r, lambda_m = 1.0e-2, 5.0e-2
+lambda_r, lambda_m = 1.0e-1, 1.0e-1
 mmd_val = mmd.mix_rbf_mmd2(
     features_data, features_generated, sigmas=args.mmd_sigmas)
 gan_val = tf.reduce_mean(tf.log(y_data)) + tf.reduce_mean(
@@ -241,26 +241,44 @@ with tf.Session(config=config) as sess:
     tf.logging.info("Beginnning training.")
     for epoch in range(max_epochs):
         for batch_i, batch in enumerate(batch_gen()):
+            g_step = tf.train.global_step(sess, global_step)
             tf.logging.info("Batch: {}/{}".format(batch_i, num_batches))
 
             z_value = np.random.normal(
-                0.1, 1, size=(batch_size, z_prior_size)).astype(np.float32)
+                0, 1, size=(batch_size, z_prior_size)).astype(np.float32)
 
-            # TODO this is kind of messy. basically, batch_gen() returns a tensor, which
-            # must be "fed" through this assign call here. batch_gen() has to return a
-            # tensor because i'm not sure how else to feed sentences in.
-            # if we feed just IDs, then each sentence has to be padded already when it
-            # gets fed in, in which case we need some reserved ID which should be
-            # converted to padding instead of being looked up in the embeddings.
-            # TODO https://github.com/tensorflow/tensorflow/issues/2382#issuecomment-224335676
-            # might be a solution.
+            # run discriminator once for every n times generator runs
+            # TODO not only is this ugly, but it doesn't work exactly right.
+            # it's pretty close though.
+            # actually i think it does work
+            if g_step % (args.g_it_per_d_it + 1) == (g_step // (
+                    args.g_it_per_d_it + 1)) % (args.g_it_per_d_it + 1):
+                tf.logging.info("Running D.")
+                d_it += 1
 
-            summary_str, _ = sess.run(
-                [merged_summary_op, d_train_op],
-                feed_dict={
-                    z_prior: z_value,
-                    x_data: batch
-                })
+                summary_str, _ = sess.run(
+                    [merged_summary_op, d_train_op],
+                    feed_dict={
+                        z_prior: z_value,
+                        x_data: batch
+                    })
+
+            else:
+
+                out_sentence, summary_str, _ = sess.run(
+                    [x_generated_ids, merged_summary_op, g_train_op],
+                    feed_dict={
+                        z_prior: z_value,
+                        x_data: batch
+                    })
+
+                tf.logging.debug("Generated sentences: {}".format(
+                    "\n".join([
+                        " ".join([
+                            reversed_dictionary[word_id]
+                            for word_id in sentence
+                        ]) for sentence in out_sentence
+                    ])))
 
             writer.add_summary(
                 summary_str,
@@ -272,38 +290,6 @@ with tf.Session(config=config) as sess:
                     sess,
                     os.path.join('.', args.checkpoint_dir, 'model'),
                     global_step=tf.train.global_step(sess, global_step))
-
-            # For every 1 training iteration of d, we train g multiple times.
-            for _ in range(args.g_it_per_d_it):
-                z_value = np.random.normal(
-                    0.1, 1, size=(batch_size, z_prior_size)).astype(
-                        np.float32)
-
-                out_sentence, summary_str, _ = sess.run(
-                    [x_generated_ids, merged_summary_op, g_train_op],
-                    feed_dict={
-                        z_prior: z_value,
-                        x_data: batch
-                    })
-
-                writer.add_summary(
-                    summary_str,
-                    global_step=tf.train.global_step(sess, global_step))
-
-                tf.logging.debug("Generated sentences: {}".format(
-                    "\n".join([
-                        " ".join([
-                            reversed_dictionary[word_id]
-                            for word_id in sentence
-                        ]) for sentence in out_sentence
-                    ])))
-
-                # TODO we currently replicate this; should find a cleaner way.
-                if tf.train.global_step(sess, global_step) % 10000 == 0:
-                    saver.save(
-                        sess,
-                        os.path.join('.', args.checkpoint_dir, 'model'),
-                        global_step=tf.train.global_step(sess, global_step))
 
     # Save once all epochs are done.
     saver.save(
