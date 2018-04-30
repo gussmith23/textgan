@@ -5,11 +5,12 @@ import numpy as np
 from generator import build_generator
 from bleu import compute_bleu
 
-parser = argparse.ArgumentParser(description='Generate sentences from trained TextGAN model.')
+parser = argparse.ArgumentParser(
+    description='Generate sentences from trained TextGAN model.')
 parser.add_argument(
     '--num-to-generate',
     type=int,
-    default=320,
+    default=10,
     help='number of sentences to generate')
 parser.add_argument(
     '--embeddings-file',
@@ -23,13 +24,22 @@ parser.add_argument(
     help='filepath to checkpoint containing trained textgan parameters')
 parser.add_argument(
     '--dataset-name', type=str, required=True, help='name of dataset')
+parser.add_argument(
+    '--compute-bleu',
+    type=bool,
+    default=False,
+    help=
+    'whether to compute the BLEU score of the generated sentences. WARNING: takes a long time (up to 20 mins per sentence!)'
+)
 args = parser.parse_args()
 
-data, dictionary, reversed_dictionary = data.datasets.get(args.dataset_name)
+data, dictionary, reversed_dictionary, _, _, test_data = data.datasets.get_split(
+    args.dataset_name)
 
 num_classes = len(reversed_dictionary)
 z_prior_size = 900
-end_of_sentence_id = dictionary["<END>"] # TODO shouldn't be hardcoded like this.
+end_of_sentence_id = dictionary[
+    "<END>"]  # TODO shouldn't be hardcoded like this.
 max_sentence_length = 20
 hidden_layer_size = 500
 
@@ -60,13 +70,16 @@ with tf.Session(config=config) as sess:
     sentences_as_ids, sentences_as_strs = [], []
     for sentence in out_sentence:
         try:
-            take_len = 1 + np.where(sentence==end_of_sentence_id)[0][0]
+            take_len = 1 + np.where(sentence == end_of_sentence_id)[0][0]
         except IndexError:
             take_len = len(sentence)
         sentences_as_ids.append(sentence[:take_len].tolist())
-        sentences_as_strs.append(" ".join([reversed_dictionary[word_id] for word_id in sentence[:take_len]]))
+        sentences_as_strs.append(" ".join(
+            [reversed_dictionary[word_id] for word_id in sentence[:take_len]]))
 
-bleu_out = compute_bleu([data]*len(sentences_as_ids), sentences_as_ids)
-
-for sentence in sentences_as_strs: print(sentences_as_strs)
-print(bleu_out)
+for sentence in sentences_as_strs:
+    print(sentence)
+if args.compute_bleu:
+    bleu_out = compute_bleu([test_data] * len(sentences_as_ids),
+                            sentences_as_ids)
+    print(bleu_out)
